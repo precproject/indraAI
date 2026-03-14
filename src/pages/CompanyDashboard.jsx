@@ -3,8 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, Map, TrendingUp, Search, Bell, LogOut, Sprout } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, Legend } from 'recharts';
 import { Link } from 'react-router-dom';
+import { dbService } from '../services/firebase';
+import { aiService } from '../services/aiService';
 
 const CompanyDashboard = () => {
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResultText, setSearchResultText] = useState('');
+
   // The switch that controls which screen we are looking at in the control room
   const [activeScreen, setActiveScreen] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
@@ -244,7 +249,7 @@ const CompanyDashboard = () => {
               <motion.div key="query" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-white mb-2">Natural Language Query</h2>
-                  <p className="text-white/50 text-sm">Ask questions to our AI about the anonymized farmer database.</p>
+                  <p className="text-white/50 text-sm">Ask IndraAI about the real anonymized farmer database.</p>
                 </div>
 
                 <div className="bg-white/5 border border-leaf/20 rounded-2xl p-6 mb-6">
@@ -253,33 +258,47 @@ const CompanyDashboard = () => {
                       type="text" 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="e.g. How many Nashik farmers bought DAP fertilizer this week?"
+                      placeholder="e.g. Which district bought the most fertilizer?"
                       className="flex-1 bg-[#0a1a0e] border border-leaf/30 rounded-xl px-5 py-4 text-white placeholder-white/30 focus:outline-none focus:border-leaf-light transition-colors"
                     />
                     <button 
-                      onClick={() => {
-                        if(searchQuery) setShowResult(true);
+                      onClick={async () => {
+                        if(!searchQuery) return;
+                        setIsSearching(true);
+                        setShowResult(false);
+                        
+                        try {
+                          // 1. The Manager asks the Warehouse for all the real files
+                          // (In a massive app, we'd only pull a summary, but for now we pull the ledger)
+                          const allLedgerData = await dbService.getDocumentsByField('ledger', 'type', 'expense');
+                          
+                          // 2. We organize the files into a neat summary for the AI Librarian
+                          const districtSummary = {};
+                          allLedgerData.forEach(receipt => {
+                            const dist = receipt.district || 'Unknown';
+                            if (!districtSummary[dist]) districtSummary[dist] = { total_spent: 0, fertilizer_count: 0 };
+                            districtSummary[dist].total_spent += receipt.amount;
+                            if (receipt.category === 'खते') districtSummary[dist].fertilizer_count += 1;
+                          });
+
+                          // 3. We hand the question and the organized summary to Sarvam AI
+                          const aiAnswer = await aiService.analyzeCompanyQuery(searchQuery, districtSummary);
+                          
+                          setSearchResultText(aiAnswer);
+                          setShowResult(true);
+                        } catch (error) {
+                          setSearchResultText("Error reading the warehouse data. Please check your API keys.");
+                          setShowResult(true);
+                        } finally {
+                          setIsSearching(false);
+                        }
                       }}
-                      className="bg-leaf hover:bg-leaf-dark text-white px-8 py-4 rounded-xl font-bold transition-colors flex items-center gap-2"
+                      disabled={isSearching}
+                      className="bg-leaf hover:bg-leaf-dark text-white px-8 py-4 rounded-xl font-bold transition-colors flex items-center gap-2 disabled:opacity-50"
                     >
-                      <Search size={20} /> Search
+                      {isSearching ? <span className="animate-spin">⏳</span> : <Search size={20} />} 
+                      {isSearching ? 'Searching...' : 'Search'}
                     </button>
-                  </div>
-                  
-                  {/* Suggestion Chips */}
-                  <div className="flex flex-wrap gap-3 mt-4">
-                    {['Pest issues in Vidarbha', 'Districts with highest fertilizer demand', 'Soybean harvest progress'].map((suggestion, idx) => (
-                      <button 
-                        key={idx}
-                        onClick={() => {
-                          setSearchQuery(suggestion);
-                          setShowResult(false);
-                        }}
-                        className="bg-white/5 border border-white/10 hover:border-leaf/50 text-white/70 hover:text-white px-4 py-2 rounded-full text-xs font-semibold transition-colors"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -290,15 +309,13 @@ const CompanyDashboard = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-leaf/10 border border-leaf/30 rounded-2xl p-6"
                   >
-                    <p className="text-xs font-bold text-leaf-light uppercase tracking-widest mb-4">Query Result</p>
-                    <p className="text-lg text-white/90 leading-relaxed font-marathi">
-                      "नाशिक जिल्ह्यात या आठवड्यात <strong className="text-green-400">8,247 शेतकऱ्यांनी</strong> DAP खत विकत घेतले —
-                      मागील आठवड्यापेक्षा <strong className="text-yellow-400">+23% जास्त</strong>. 
-                      Pimpalgaon taluka मध्ये सर्वाधिक खरेदी झाली आहे. खरीप हंगाम जोरात सुरू आहे."
+                    <p className="text-xs font-bold text-leaf-light uppercase tracking-widest mb-4">IndraAI Query Result</p>
+                    <p className="text-lg text-white/90 leading-relaxed font-marathi whitespace-pre-wrap">
+                      {searchResultText}
                     </p>
                     <div className="flex gap-3 mt-6">
-                      <span className="bg-green-500/20 text-green-300 border border-green-500/30 px-3 py-1.5 rounded-lg text-[10px] font-bold">Confidence: 94%</span>
-                      <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg text-[10px] font-bold">Data points: 8,247</span>
+                      <span className="bg-green-500/20 text-green-300 border border-green-500/30 px-3 py-1.5 rounded-lg text-[10px] font-bold">Real-time Firebase Data</span>
+                      <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg text-[10px] font-bold">Processed by Sarvam AI</span>
                     </div>
                   </motion.div>
                 )}

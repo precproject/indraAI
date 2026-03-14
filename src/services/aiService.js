@@ -1,179 +1,195 @@
-// src/services/aiService.js
-
-// This is where we keep the special passcodes to talk to the Sarvam translators.
-// If the passcodes are missing while we are building the building, the clerk will use a "demo mode" 
-// so the office doesn't stop working.
-const getSarvamKey = () => localStorage.getItem('sm_sarvam_key') || '';
-
 export const aiService = {
-  
-  // ── 1. THE EARS (Listening to the Farmer) ──
-  async listenToMarathi(audioBlob) {
-    const key = getSarvamKey();
-    if (!key) {
-      console.log("Passcode missing. Using backup browser microphone.");
-      throw new Error("fallback_to_browser"); 
-    }
-
-    // We package the voice recording into a neat parcel to send to the translator
-    const parcel = new FormData();
-    parcel.append('file', audioBlob, 'voice.webm');
-    parcel.append('model', 'saaras:v2');
-    parcel.append('language_code', 'mr-IN');
-
+  getConfig() {
     try {
-      const response = await fetch('https://api.sarvam.ai/speech-to-text', {
-        method: 'POST',
-        headers: { 'api-subscription-key': key },
-        body: parcel
-      });
-      
-      const reply = await response.json();
-      return reply.transcript || '';
-    } catch (error) {
-      console.log("The translator is busy. Using backup.");
-      throw new Error("fallback_to_browser");
+      return JSON.parse(localStorage.getItem('sm_config')) || {};
+    } catch {
+      return {};
     }
   },
 
-  // ── 2. THE MOUTH (Speaking to the Farmer) ──
-  async speakMarathi(text) {
-    const key = getSarvamKey();
-    if (!key || !text) return null;
+  // ── 1. THE EARS (Sarvam Speech-to-Text) ──
+  async sttSarvam(audioBlob) {
+    const cfg = this.getConfig();
+    if (!cfg.sarvamKey) throw new Error('Sarvam API key is missing');
 
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('model', 'saaras:v2');
+    formData.append('language_code', 'mr-IN');
+    formData.append('with_timestamps', 'false');
+    formData.append('with_disfluencies', 'false');
+
+    const res = await fetch('https://api.sarvam.ai/speech-to-text', {
+      method: 'POST',
+      headers: { 'api-subscription-key': cfg.sarvamKey },
+      body: formData
+    });
+
+    if (!res.ok) throw new Error('Sarvam STT failed');
+    const data = await res.json();
+    return data.transcript || '';
+  },
+
+  // ── 2. THE MOUTH (Sarvam Text-to-Speech) ──
+  async ttsSarvam(text) {
+    const cfg = this.getConfig();
+    if (!cfg.sarvamKey) return null;
+
+    const res = await fetch('https://api.sarvam.ai/text-to-speech', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-subscription-key': cfg.sarvamKey
+      },
+      body: JSON.stringify({
+        inputs: [text],
+        target_language_code: 'mr-IN',
+        speaker: cfg.speaker || 'anushka',
+        pitch: 0,
+        pace: 0.85,
+        loudness: 1.5,
+        speech_sample_rate: 22050,
+        enable_preprocessing: true,
+        model: 'bulbul:v1'
+      })
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.audios && data.audios[0]) {
+      return data.audios[0];
+    }
+    return null;
+  },
+
+  async playAudio(text) {
+    if (!text) return;
     try {
-      // We send the written words and ask for an audio recording back
-      const response = await fetch('https://api.sarvam.ai/text-to-speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'api-subscription-key': key
-        },
-        body: JSON.stringify({
-          inputs: [text],
-          target_language_code: 'mr-IN',
-          speaker: 'anushka', // The voice of our receptionist
-          model: 'bulbul:v1'
-        })
-      });
-
-      const reply = await response.json();
-      // If we get an audio recording back, we play it on the office speakers
-      if (reply.audios && reply.audios[0]) {
-        const audio = new Audio("data:audio/wav;base64," + reply.audios[0]);
-        audio.play();
-        return true;
+      const base64Audio = await this.ttsSarvam(text);
+      if (base64Audio) {
+        const binary = atob(base64Audio);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        await audio.play();
+        return;
       }
     } catch (error) {
-      console.log("The speaker is unplugged. The farmer will just read the screen.");
+      console.log('Audio playback failed, falling back to browser voice.');
     }
-    return false;
+    
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'mr-IN';
+      window.speechSynthesis.speak(utterance);
+    }
   },
 
-  // ── 3. THE BRAIN (Understanding and Doing the Math) ──
-  async askManager(farmerMessage, currentDeskFiles) {
-    // We give the manager a strict briefing before they answer.
-    const briefingFolder = `
-      तू शेतकरी मित्र आहेस. फक्त मराठीत उत्तरे दे.
-      शेतकऱ्याचे नाव: ${currentDeskFiles.user?.name || 'शेतकरी'}
-      जिल्हा: ${currentDeskFiles.user?.district || 'महाराष्ट्र'}
-      
-      नेहमी या अचूक नमुन्यात (फॉर्ममध्ये) उत्तर दे:
-      {
-        "voice_text": "वाचण्यासाठी १-२ सोपी मराठी वाक्ये",
-        "display_text": "स्क्रीनवर दाखवण्यासाठी सविस्तर माहिती",
-        "intent": "EXPENSE_LOG किंवा INCOME_LOG किंवा GENERAL",
-        "chart": { "type": "pie", "data": [{"name": "खत", "value": 1500}] },
-        "action": { "type": "ADD_LEDGER", "amount": 1500, "category": "खते" }
-      }
-    `;
+  // ── 3. THE BRAIN (Sarvam Chat LLM for the Farmer App) ──
+  async getChatResponse(userText, userProfile, activeCycles, marketData) {
+    const cfg = this.getConfig();
+    if (!cfg.sarvamKey) throw new Error('Sarvam API key is missing');
 
-    const key = getSarvamKey();
+    const cyclesSummary = activeCycles.map(c => ({ id: c.id, crop: c.crop, phase: c.currentPhase }));
+
+    const systemPrompt = `You are "IndraAI" (इंद्र AI), a smart farm manager for Maharashtra. Reply ONLY in Marathi.
+Farmer: ${userProfile.name} | District: ${userProfile.district} | Active Crops: ${JSON.stringify(cyclesSummary)}
+
+You MUST reply with a strict JSON format exactly like this, nothing else:
+{
+  "voice_text": "वाचण्यासाठी १-२ सोपी मराठी वाक्ये",
+  "display_text": "स्क्रीनवर दाखवण्यासाठी सविस्तर माहिती",
+  "intent": "EXPENSE_LOG|INCOME_LOG|MARKET_QUERY|GENERAL",
+  "chart": { "type": "pie|none", "data": [] },
+  "action": { "type": "ADD_LEDGER|NONE", "payload": null },
+  "tip": "short tip"
+}`;
+
+    const res = await fetch('https://api.sarvam.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-subscription-key': cfg.sarvamKey
+      },
+      body: JSON.stringify({
+        model: 'sarvam-105b',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userText }
+        ],
+        temperature: 0.3
+      })
+    });
+
+    if (!res.ok) throw new Error('Sarvam Brain error');
+
+    const data = await res.json();
+    const rawText = data.choices[0].message.content.trim();
     
-    // If we haven't bought the permanent passcodes yet, the manager uses their 
-    // own common sense (Demo Mode) to keep the office running smoothly.
-    if (!key) {
-      return this.useManagerCommonSense(farmerMessage);
-    }
-
     try {
-      // Sending the briefing folder and the farmer's question to the Sarvam Brain
-      const response = await fetch('https://api.sarvam.ai/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'api-subscription-key': key
-        },
-        body: JSON.stringify({
-          model: "sarvam-105b", // The Indian-language expert manager
-          messages: [
-            { role: "system", content: briefingFolder },
-            { role: "user", content: farmerMessage }
-          ],
-          temperature: 0.3 // Keep the manager focused and strict, not creative
-        })
-      });
-
-      const reply = await response.json();
-      const managerForm = reply.choices[0].message.content;
-      
-      // We read the form the manager filled out
-      return JSON.parse(managerForm);
-
-    } catch (error) {
-      console.log("Manager is on a break. Using common sense.");
-      return this.useManagerCommonSense(farmerMessage);
+      const cleanJson = rawText.replace(/```json|```/g, '').trim();
+      return JSON.parse(cleanJson);
+    } catch (e) {
+      return {
+        voice_text: 'माफ करा, मला समजले नाही.',
+        display_text: 'माफ करा, तांत्रिक अडचण आली आहे.',
+        intent: 'GENERAL',
+        chart: { type: 'none' },
+        action: { type: 'NONE' }
+      };
     }
   },
 
-  // ── 4. THE BACKUP PLAN (Demo Mode Logic) ──
-  // If the internet drops or keys are missing, the office doesn't close. 
-  // It handles the most common farmer requests automatically.
-  useManagerCommonSense(message) {
-    const text = message.toLowerCase();
-    
-    // Scenario 1: The farmer bought fertilizer
-    if (text.includes('खत') || text.includes('युरिया') || text.includes('dap')) {
-      return {
-        voice_text: "मी खताचा खर्च नोंदवला आहे.",
-        display_text: "तुमच्या पिकासाठी खताचा खर्च यशस्वीरित्या नोंदवला गेला आहे.",
-        intent: "EXPENSE_LOG",
-        saved: true,
-        chart: {
-          type: "pie",
-          data: [
-            { name: "खते", value: 1500 },
-            { name: "बियाणे", value: 3000 },
-            { name: "मजुरी", value: 1000 }
-          ]
-        },
-        action: {
-          type: "ADD_LEDGER",
-          payload: { type: 'expense', amount: 1500, category: 'खते', title: 'खत खरेदी' }
-        }
-      };
-    }
-    
-    // Scenario 2: The farmer wants the market price
-    if (text.includes('भाव') || text.includes('बाजार') || text.includes('दर')) {
-      return {
-        voice_text: "आज पिंपळगाव मार्केटमध्ये सर्वात चांगला भाव चालू आहे.",
-        display_text: "आज कांद्याला पिंपळगावमध्ये सर्वाधिक ₹२,२०० भाव मिळत आहे.",
-        intent: "MARKET_QUERY",
-        saved: false,
-        chart: { type: "none" },
-        action: { type: "NONE" }
-      };
-    }
+  // ── 4. THE LIBRARIAN (Sarvam Data Analyst for Company Dashboard) ──
+  async analyzeCompanyQuery(companyQuestion, warehouseDataSummary) {
+    const cfg = this.getConfig();
+    if (!cfg.sarvamKey) throw new Error('Sarvam API key is missing');
 
-    // Default friendly reply
-    return {
-      voice_text: "माफ करा, मला समजले नाही. पुन्हा सांगाल का?",
-      display_text: "मला तुमची नोंद समजली नाही. कृपया पुन्हा प्रयत्न करा.",
-      intent: "GENERAL",
-      saved: false,
-      chart: { type: "none" },
-      action: { type: "NONE" }
-    };
+    const systemPrompt = `You are a strict data analyst for an agricultural company. 
+I will give you a summary of the real receipts from our warehouse (Firebase) and a manager's question.
+Answer the manager's question accurately based ONLY on the data provided. Write the answer clearly and professionally. Do not make up any numbers.
+
+WAREHOUSE DATA SUMMARY:
+${JSON.stringify(warehouseDataSummary)}`;
+
+    const res = await fetch('https://api.sarvam.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-subscription-key': cfg.sarvamKey
+      },
+      body: JSON.stringify({
+        model: 'sarvam-105b',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: companyQuestion }
+        ],
+        temperature: 0.1 // Extremely strict, no making up facts
+      })
+    });
+
+    if (!res.ok) throw new Error('Sarvam Analyst error');
+    const data = await res.json();
+    return data.choices[0].message.content.trim();
+  },
+
+  async testConnection() {
+    const cfg = this.getConfig();
+    const results = { claude: true, sarvam: false }; // We bypass Claude test now since it's removed
+
+    if (cfg.sarvamKey) {
+      try {
+        const res = await fetch('https://api.sarvam.ai/text-to-speech', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'api-subscription-key': cfg.sarvamKey },
+          body: JSON.stringify({ inputs: ['test'], target_language_code: 'mr-IN', speaker: 'anushka', model: 'bulbul:v1' })
+        });
+        results.sarvam = res.ok;
+      } catch { results.sarvam = false; }
+    }
+    return results;
   }
 };
