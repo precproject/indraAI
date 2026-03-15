@@ -3,14 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, TrendingUp, Sun, Sprout, ArrowRight, ShieldCheck, 
   Database, Building, Smartphone, CheckCircle2, Coins, 
-  Lock, ChevronDown, Quote, MapPin, Calendar, Users,BarChart3 
+  Lock, ChevronDown, Quote, MapPin, Calendar, Users, BarChart3 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Landing = () => {
   const [expandedPhase, setExpandedPhase] = useState(0);
 
-  // Animation presets for smooth scrolling reveals
   const fadeUp = {
     hidden: { opacity: 0, y: 40 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } }
@@ -51,7 +50,7 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-[#fdf8f0] font-sans overflow-x-hidden selection:bg-[#4a9e4a] selection:text-white">
       
-{/* ── TOP NAVIGATION ── */}
+      {/* ── TOP NAVIGATION ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#fdf8f0]/90 backdrop-blur-xl border-b border-[#d4a853]/20 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group">
@@ -83,13 +82,11 @@ const Landing = () => {
 
       {/* ── HERO SECTION (FARMER FOCUS) ── */}
       <section className="relative pt-32 pb-20 px-6 lg:pt-40 lg:pb-32 overflow-hidden">
-        {/* Decorative Background Elements */}
         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-[#d4edda] to-transparent rounded-full blur-3xl opacity-60 -translate-y-1/2 translate-x-1/3 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-[#f5e6c8] to-transparent rounded-full blur-3xl opacity-60 translate-y-1/4 -translate-x-1/4 pointer-events-none" />
 
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
           
-          {/* Left: Copy & CTA */}
           <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="max-w-2xl">
             <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-white border border-[#d4a853]/30 text-[#2d6a2d] px-4 py-2 rounded-full text-xs font-bold mb-8 shadow-sm">
               <span className="relative flex h-2.5 w-2.5">
@@ -109,6 +106,12 @@ const Landing = () => {
               काहीही टाइप करण्याची गरज नाही. <strong className="text-[#2c1810]">फक्त मायक्रोफोन दाबा आणि मराठीत बोला.</strong>
             </motion.p>
 
+            <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-3 mb-10">
+              {[ '📊 बाजारभाव', '🌾 पीक चक्र', '💰 नफा ट्रॅकिंग', '🌤️ हवामान', '🏆 मोफत क्रेडिट्स'].map((tag, i) => (
+                <span key={i} className="bg-white px-4 py-2 rounded-full text-sm font-bold text-[#2c1810] border border-[#d4a853]/30 shadow-sm">{tag}</span>
+              ))}
+            </motion.div>
+
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 mb-12">
               <Link to="/app" className="px-8 py-4 rounded-2xl text-lg font-bold bg-[#2c1810] text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center gap-3">
                 <Mic size={24} className="text-[#4a9e4a]" />
@@ -121,7 +124,7 @@ const Landing = () => {
             </motion.div>
           </motion.div>
 
-          {/* Right: Premium Phone Mockup Animation */}
+          {/* Right: Premium Phone Mockup Animation with Extended Examples */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.9, rotateY: 10 }}
             animate={{ opacity: 1, scale: 1, rotateY: 0 }}
@@ -131,9 +134,8 @@ const Landing = () => {
             <div className="relative bg-[#1c1008] p-3 rounded-[3rem] shadow-2xl border-[6px] border-[#2c1810]/10 ring-1 ring-white/20 transform-gpu rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
               <div className="absolute top-0 inset-x-0 h-6 bg-[#1c1008] rounded-b-3xl w-40 mx-auto z-20"></div>
               
-              {/* Fake App Screen */}
               <div className="bg-[#fdf8f0] h-[650px] rounded-[2.25rem] overflow-hidden relative flex flex-col">
-                <div className="bg-gradient-to-br from-[#1a4d1a] to-[#2d6a2d] p-6 pb-8 text-white">
+                <div className="bg-gradient-to-br from-[#1a4d1a] to-[#2d6a2d] p-6 pb-8 text-white shrink-0">
                   <p className="text-xs opacity-70 mb-1">नमस्कार 🙏</p>
                   <h3 className="text-xl font-black mb-4">राजेश पाटील</h3>
                   <div className="grid grid-cols-2 gap-2">
@@ -142,24 +144,38 @@ const Landing = () => {
                   </div>
                 </div>
                 
-                <div className="flex-1 p-4 flex flex-col gap-4">
-                  <div className="self-end bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] text-white p-3 rounded-2xl rounded-tr-sm text-sm font-marathi shadow-md w-3/4">
+                {/* Scrollable Chat Area with 3 different examples */}
+                <div className="flex-1 p-4 flex flex-col gap-3 overflow-y-auto scrollbar-hide pb-20">
+                  <div className="self-end bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] text-white p-2.5 rounded-2xl rounded-tr-sm text-[11px] font-marathi shadow-md w-3/4">
                     लासलगावमध्ये ५ क्विंटल कांदा ₹२१०० ला विकला.
                   </div>
-                  <div className="self-start bg-white border border-[#d4a853]/30 p-3 rounded-2xl rounded-tl-sm text-sm font-marathi shadow-sm w-5/6">
-                    ✅ नोंद जतन केली! पण पिंपळगावमध्ये आज ₹२,२०० दर आहे — ₹५०० जास्त मिळाले असते.
+                  <div className="self-start bg-white border border-[#d4a853]/30 p-2.5 rounded-2xl rounded-tl-sm text-[11px] font-marathi shadow-sm w-5/6">
+                    ✅ नोंद जतन केली! पिंपळगावमध्ये आज ₹२,२०० दर आहे.
+                  </div>
+                  
+                  <div className="self-end bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] text-white p-2.5 rounded-2xl rounded-tr-sm text-[11px] font-marathi shadow-md w-3/4 mt-2">
+                    उद्या फवारणी करू का?
+                  </div>
+                  <div className="self-start bg-white border border-[#d4a853]/30 p-2.5 rounded-2xl rounded-tl-sm text-[11px] font-marathi shadow-sm w-5/6">
+                    🌧️ उद्या पावसाची शक्यता आहे. फवारणी परवा करा.
+                  </div>
+
+                  <div className="self-end bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] text-white p-2.5 rounded-2xl rounded-tr-sm text-[11px] font-marathi shadow-md w-3/4 mt-2">
+                    पानांवर पिवळे डाग पडलेत.
+                  </div>
+                  <div className="self-start bg-white border border-[#d4a853]/30 p-2.5 rounded-2xl rounded-tl-sm text-[11px] font-marathi shadow-sm w-5/6">
+                    🌱 हा करपा रोग असू शकतो. औषध फवारा.
                   </div>
                 </div>
 
-                <div className="p-6 flex justify-center pb-8">
-                  <div className="w-20 h-20 bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(74,158,74,0.4)]">
-                    <Mic size={32} className="text-white" />
+                <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-center bg-gradient-to-t from-[#fdf8f0] to-transparent">
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(74,158,74,0.4)]">
+                    <Mic size={28} className="text-white" />
                   </div>
                 </div>
               </div>
             </div>
             
-            {/* Floating Badges */}
             <motion.div animate={{ y: [-10, 10, -10] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }} className="absolute -right-12 top-32 bg-white p-4 rounded-2xl shadow-xl border border-[#d4a853]/20">
               <p className="text-[10px] font-bold text-[#8b5e3c] uppercase">ROI Tracking</p>
               <p className="text-2xl font-black text-[#4a9e4a]">87%</p>
@@ -174,7 +190,7 @@ const Landing = () => {
       </section>
 
       {/* ── HOW IT WORKS (FARMER) ── */}
-      <section id="farmer" className="py-24 px-6 bg-white relative">
+      <section id="features" className="py-24 px-6 bg-white relative">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <span className="text-[#4a9e4a] font-bold tracking-widest uppercase text-sm mb-2 block">कसे काम करते?</span>
@@ -187,14 +203,7 @@ const Landing = () => {
               { title: "२. IndraAI समजतो", desc: "आमचा AI तुमचा आवाज अचूक ओळखतो, गणित करतो आणि योग्य खात्यात नोंद टाकतो.", icon: <ShieldCheck size={32} />, color: "bg-[#fdf8f0] text-[#d4a853] border-[#d4a853]/40" },
               { title: "३. नफा व सल्ला", desc: "तुमचा एकरी खर्च, नफा आणि पुढील हवामानाचा सल्ला तुम्हाला लगेच स्क्रीनवर दिसतो.", icon: <BarChart3 size={32} />, color: "bg-[#dbeafe] text-[#1e40af] border-[#93c5fd]" }
             ].map((feat, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.2 }}
-                className="p-8 rounded-3xl bg-white border border-[#d4a853]/20 shadow-lg hover:shadow-xl transition-all"
-              >
+              <motion.div key={idx} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: idx * 0.2 }} className="p-8 rounded-3xl bg-white border border-[#d4a853]/20 shadow-lg hover:shadow-xl transition-all">
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 border ${feat.color}`}>
                   {feat.icon}
                 </div>
@@ -206,7 +215,7 @@ const Landing = () => {
         </div>
       </section>
 
-{/* ── STORY SECTION (Rameshji) ── */}
+      {/* ── STORY SECTION (Rameshji) ── */}
       <section id="story" className="py-20 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -218,9 +227,8 @@ const Landing = () => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Before */}
             <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="bg-[#fef2f2] border border-[#fca5a5] rounded-3xl p-8 relative">
-              <span className="absolute -top-4 left-8 bg-red-500 text-white px-4 py-1 rounded-full text-xs font-bold tracking-widest">पूर्वीची अडचण (BEFORE)</span>
+              <span className="absolute -top-4 left-8 bg-red-500 text-white px-4 py-1 rounded-full text-xs font-bold tracking-widest">पूर्वीची अडचण</span>
               <p className="text-xl font-bold text-red-900 mb-6 italic font-marathi">"हंगाम संपला की नफा-तोटा कळेल..."</p>
               <div className="space-y-4">
                 <div className="flex gap-4 items-start">
@@ -234,7 +242,6 @@ const Landing = () => {
               </div>
             </motion.div>
 
-            {/* After */}
             <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="bg-[#f0fdf4] border border-[#86efac] rounded-3xl p-8 relative shadow-lg shadow-green-900/5">
               <span className="absolute -top-4 left-8 bg-[#2d6a2d] text-white px-4 py-1 rounded-full text-xs font-bold tracking-widest">आता (NOW)</span>
               <p className="text-xl font-bold text-[#1a4d1a] mb-6 italic font-marathi">"माझा फोन माझा हिशोब ठेवतो..."</p>
@@ -253,78 +260,7 @@ const Landing = () => {
         </div>
       </section>
 
-      
-      {/* ── ENTERPRISE SECTION (DARK THEME) ── */}
-      <section id="enterprise" className="py-32 px-6 bg-[#0a1a0e] text-white relative overflow-hidden">
-        {/* Dark theme decorative lights */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#4a9e4a]/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#d4a853]/10 rounded-full blur-[100px] pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
-          
-          <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-            <span className="inline-block bg-[#4a9e4a]/20 text-[#4ade80] border border-[#4a9e4a]/30 px-4 py-1.5 rounded-full text-xs font-bold mb-6 uppercase tracking-widest">
-              Agri-Input Companies
-            </span>
-            <h2 className="text-4xl lg:text-6xl font-black mb-6 leading-tight">
-              Last-Mile Visibility. <br/><span className="text-[#4ade80]">Finally.</span>
-            </h2>
-            <p className="text-lg text-white/70 mb-10 leading-relaxed">
-              Stop guessing where demand is. Access real-time, anonymized, geo-tagged purchase data from thousands of Maharashtra farmers. Make distribution decisions based on actual field activity.
-            </p>
-            
-            <ul className="space-y-4 mb-10">
-              {[
-                { title: 'Regional Demand Heatmaps', desc: 'See which districts are buying specific fertilizers today.' },
-                { title: 'Crop Lifecycle Tracking', desc: 'Know exactly when sowing and harvesting happen in real-time.' },
-                { title: 'Natural Language Querying', desc: 'Just type: "How many Vidarbha farmers bought DAP this week?"' }
-              ].map((item, idx) => (
-                <li key={idx} className="flex items-start gap-3">
-                  <CheckCircle2 className="text-[#4ade80] mt-1 shrink-0" size={20} />
-                  <div>
-                    <h4 className="font-bold text-white">{item.title}</h4>
-                    <p className="text-sm text-white/60">{item.desc}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <Link to="/dashboard" className="inline-flex px-8 py-4 rounded-2xl text-lg font-bold bg-white text-[#0a1a0e] shadow-xl hover:bg-[#fdf8f0] transition-all items-center gap-3">
-              <Database size={20} /> View Analytics Dashboard
-            </Link>
-          </motion.div>
-
-          {/* Abstract Dashboard UI Element */}
-          <motion.div 
-            initial={{ opacity: 0, x: 30 }} 
-            whileInView={{ opacity: 1, x: 0 }} 
-            viewport={{ once: true }}
-            className="bg-[#0d1f12] rounded-3xl p-6 border border-[#4a9e4a]/20 shadow-2xl relative"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <div className="h-4 w-32 bg-white/10 rounded-full"></div>
-              <div className="flex gap-2"><div className="w-3 h-3 rounded-full bg-red-500"/><div className="w-3 h-3 rounded-full bg-yellow-500"/><div className="w-3 h-3 rounded-full bg-green-500"/></div>
-            </div>
-            
-            {/* Fake Heatmap Chart */}
-            <div className="flex items-end gap-2 h-48 mb-6 border-b border-white/10 pb-4">
-              {[80, 40, 60, 90, 30, 70, 50].map((h, i) => (
-                <div key={i} className="flex-1 bg-gradient-to-t from-[#4a9e4a] to-[#4ade80] rounded-t-sm" style={{ height: `${h}%` }}></div>
-              ))}
-            </div>
-
-            {/* Fake Query Result */}
-            <div className="bg-[#4a9e4a]/10 border border-[#4a9e4a]/30 p-4 rounded-xl">
-              <p className="text-xs text-[#4ade80] font-bold mb-2 uppercase tracking-widest">IndraAI Query Result</p>
-              <p className="text-sm text-white/80">"8,247 farmers in Nashik district logged DAP fertilizer purchases this week. This is a 23% increase week-over-week."</p>
-            </div>
-          </motion.div>
-
-        </div>
-      </section>
-
-
-      {/* ── CREDIT FOR DATA FLYWHEEL (PRIVACY FOCUSED) ── */}
+      {/* ── CREDIT FOR DATA FLYWHEEL ── */}
       <section id="flywheel" className="py-20 px-6 bg-[#2c1810] text-white relative overflow-hidden">
         <div className="max-w-6xl mx-auto text-center relative z-10">
           <span className="text-[#4a9e4a] font-bold tracking-widest uppercase text-sm mb-2 block">Our Business Model</span>
@@ -332,49 +268,40 @@ const Landing = () => {
           <p className="text-[#d4a853] mb-12 max-w-2xl mx-auto font-marathi text-lg">तुमचा डेटा तुमचाच आहे. आम्ही सुरक्षिततेची पूर्ण काळजी घेतो.</p>
 
           <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
-            
-            {/* Step 1 */}
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="bg-white/5 border border-white/10 p-6 rounded-3xl w-full lg:w-64 text-center">
               <Smartphone size={40} className="text-[#4a9e4a] mx-auto mb-4" />
               <h3 className="font-bold text-lg mb-2">शेतकरी नोंद करतो</h3>
               <p className="text-sm text-white/60 font-marathi">खर्च आणि उत्पन्न मोफत अ‍ॅपवर बोलून नोंदवतो.</p>
             </motion.div>
-
             <ArrowRight size={24} className="text-[#4a9e4a] hidden lg:block" />
-
-            {/* Step 2 (Privacy) */}
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }} className="bg-[#4a9e4a]/20 border border-[#4a9e4a]/50 p-6 rounded-3xl w-full lg:w-64 text-center relative shadow-[0_0_30px_rgba(74,158,74,0.2)]">
               <div className="absolute -top-3 -right-3 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1"><Lock size={12}/> सुरक्षित</div>
               <Database size={40} className="text-white mx-auto mb-4" />
               <h3 className="font-bold text-lg mb-2">निनावी डेटा</h3>
               <p className="text-sm text-white/80 font-marathi">वैयक्तिक माहिती काढली जाते. फक्त जिल्ह्याचा ट्रेंड तयार होतो.</p>
             </motion.div>
-
             <ArrowRight size={24} className="text-[#4a9e4a] hidden lg:block" />
-
-            {/* Step 3 */}
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.4 }} className="bg-white/5 border border-white/10 p-6 rounded-3xl w-full lg:w-64 text-center">
               <Building size={40} className="text-[#d4a853] mx-auto mb-4" />
               <h3 className="font-bold text-lg mb-2">कंपन्या Insights घेतात</h3>
               <p className="text-sm text-white/60 font-marathi">खासगी कंपन्या या ट्रेंड्ससाठी (Analytics Dashboard) पैसे देतात.</p>
             </motion.div>
-
             <ArrowRight size={24} className="text-[#4a9e4a] hidden lg:block" />
-
-            {/* Step 4 */}
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.6 }} className="bg-white border border-[#d4a853] p-6 rounded-3xl w-full lg:w-64 text-center">
               <Coins size={40} className="text-[#d4a853] mx-auto mb-4" />
               <h3 className="font-bold text-[#2c1810] text-lg mb-2">शेतकऱ्याला क्रेडिट्स</h3>
               <p className="text-sm text-[#5c3317] font-marathi">शेतकऱ्याला खत/बियाणे खरेदीत या पैशांतून थेट सूट मिळते.</p>
             </motion.div>
-
           </div>
         </div>
       </section>
 
-{/* ── ENTERPRISE DASHBOARD SECTION ── */}
-      <section id="enterprise" className="py-24 px-6 bg-[#0a1a0e] text-white relative">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+      {/* ── ENTERPRISE SECTION ── */}
+      <section id="enterprise" className="py-24 px-6 bg-[#0a1a0e] text-white relative overflow-hidden">
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#4a9e4a]/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#d4a853]/10 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
           <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
             <span className="inline-block bg-[#4a9e4a]/20 text-[#4ade80] border border-[#4a9e4a]/30 px-4 py-1.5 rounded-full text-xs font-bold mb-6 uppercase tracking-widest">
               अग्री-इनपुट कंपन्यांसाठी
@@ -384,9 +311,8 @@ const Landing = () => {
             </h2>
             <p className="text-lg text-white/70 mb-8 font-marathi leading-relaxed">
               कोणत्या जिल्ह्यात आज खताची मागणी वाढली आहे? किती शेतकऱ्यांनी पेरणी पूर्ण केली आहे? 
-              IndraAI च्या Enterprise Dashboard द्वारे महाराष्ट्रभरातील हजारो शेतकऱ्यांचा रियल-टाइम, निनावी (Anonymized) डेटा मिळवा आणि अचूक बिझनेस निर्णय घ्या.
+              IndraAI च्या Enterprise Dashboard द्वारे महाराष्ट्रभरातील हजारो शेतकऱ्यांचा रियल-टाइम, निनावी (Anonymized) डेटा मिळवा.
             </p>
-            
             <ul className="space-y-4 mb-10">
               {[
                 { title: 'Regional Demand Heatmaps', desc: 'जिल्हानिहाय खते व बियाण्यांची आजची मागणी.' },
@@ -399,8 +325,7 @@ const Landing = () => {
                 </li>
               ))}
             </ul>
-
-            <Link to="/dashboard" className="inline-flex px-8 py-4 rounded-2xl text-lg font-bold bg-[#4a9e4a] text-white shadow-xl shadow-[#4a9e4a]/20 hover:bg-[#368636] transition-all items-center gap-3">
+            <Link to="/dashboard" className="inline-flex px-8 py-4 rounded-2xl text-lg font-bold bg-[#4a9e4a] text-white shadow-xl hover:bg-[#368636] transition-all items-center gap-3">
               <Database size={20} /> Dashboard Demo पहा
             </Link>
           </motion.div>
@@ -423,7 +348,7 @@ const Landing = () => {
         </div>
       </section>
 
-    {/* ── ROADMAP SECTION ── */}
+      {/* ── ROADMAP SECTION ── */}
       <section id="roadmap" className="py-24 px-6 bg-[#fdf8f0]">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
@@ -435,17 +360,13 @@ const Landing = () => {
           <div className="space-y-4">
             {roadmapData.map((phase, idx) => (
               <div key={idx} className="bg-white border border-[#d4a853]/30 rounded-2xl overflow-hidden shadow-sm transition-all hover:shadow-md">
-                <button 
-                  onClick={() => setExpandedPhase(expandedPhase === idx ? null : idx)}
-                  className="w-full flex items-center justify-between p-6 text-left"
-                >
+                <button onClick={() => setExpandedPhase(expandedPhase === idx ? null : idx)} className="w-full flex items-center justify-between p-6 text-left">
                   <div className="flex items-center gap-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${phase.color}`}>{phase.status}</span>
                     <h3 className="text-lg font-black text-[#2c1810]">{phase.phase}</h3>
                   </div>
                   <ChevronDown className={`text-[#8b5e3c] transition-transform duration-300 ${expandedPhase === idx ? 'rotate-180' : ''}`} />
                 </button>
-                
                 <AnimatePresence>
                   {expandedPhase === idx && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
@@ -467,40 +388,6 @@ const Landing = () => {
         </div>
       </section>
 
-{/* ── HERO SECTION ── */}
-      <section className="relative pt-32 pb-20 px-6 lg:pt-40 lg:pb-24 overflow-hidden">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-[#d4edda] to-transparent rounded-full blur-3xl opacity-60 -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
-            <motion.div variants={fadeUp} className="inline-flex items-center gap-2 bg-white border border-[#d4a853]/30 text-[#2d6a2d] px-4 py-2 rounded-full text-xs font-bold mb-6 shadow-sm">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4a9e4a] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#4a9e4a]"></span>
-              </span>
-              महाराष्ट्र-First · 100% Marathi Voice AI
-            </motion.div>
-            <motion.h1 variants={fadeUp} className="text-5xl lg:text-7xl font-black text-[#2c1810] leading-[1.1] mb-6">
-              तुमचा शेत, तुमची भाषा, <br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4a9e4a] to-[#2d6a2d]">तुमचा AI मित्र.</span>
-            </motion.h1>
-            <motion.p variants={fadeUp} className="text-lg text-[#5c3317] mb-10 font-marathi leading-relaxed max-w-2xl mx-auto">
-              कांद्याचा आजचा भाव, सोयाबीनचा हंगाम खर्च, किंवा हवामानाचा अचूक अंदाज — 
-              काहीही टाइप करण्याची गरज नाही. <strong className="text-[#2c1810]">फक्त बोला. पूर्णपणे मोफत.</strong>
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-3 mb-10">
-              {['🗣️ मराठी आवाज', '📊 बाजारभाव', '🌾 पीक चक्र', '💰 नफा ट्रॅकिंग', '🌤️ हवामान', '🏆 मोफत क्रेडिट्स'].map((tag, i) => (
-                <span key={i} className="bg-white px-4 py-2 rounded-full text-sm font-bold text-[#2c1810] border border-[#d4a853]/30 shadow-sm">{tag}</span>
-              ))}
-            </motion.div>
-            <motion.div variants={fadeUp}>
-              <Link to="/app" className="inline-flex px-10 py-4 rounded-2xl text-lg font-bold bg-[#2c1810] text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all items-center gap-3">
-                <Mic size={24} className="text-[#4a9e4a]" /> आत्ता वापरा — मोफत
-              </Link>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-      
       {/* ── FOOTER ── */}
       <footer className="bg-[#1c1008] pt-16 pb-8 px-6 text-white/60 text-center">
         <div className="max-w-4xl mx-auto">
@@ -509,13 +396,11 @@ const Landing = () => {
             <span className="text-xl font-black text-white tracking-tight">IndraAI</span>
           </div>
           <p className="text-sm mb-8">Maharashtra-First AI Farm Manager · Empowering farmers through voice technology.</p>
-          
           <div className="flex flex-wrap justify-center gap-6 text-sm font-bold mb-12">
             <Link to="/app" className="hover:text-white transition-colors">Farmer App</Link>
             <Link to="/dashboard" className="hover:text-white transition-colors">Enterprise Dashboard</Link>
             <Link to="/setup" className="hover:text-white transition-colors">System Setup</Link>
           </div>
-          
           <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center text-xs">
             <p>© 2026 IndraAI. All rights reserved.</p>
             <p className="mt-2 md:mt-0">Powered by Sarvam AI & Firebase</p>
