@@ -7,7 +7,7 @@ const getSecurityPass = () => {
 };
 
 export const apiService = {
-  // १. लॉगिन करताना पास लागत नाही, कारण तो आपल्याला आतून मिळणार असतो
+  // १. लॉगिन करताना पास लागत नाही
   async loginUser(phone, district) {
     const response = await fetch(`${API_BASE}/login`, {
       method: 'POST',
@@ -18,19 +18,19 @@ export const apiService = {
     return await response.json();
   },
 
-  // ── नवीन: पेज रिफ्रेश झाल्यावर फाईल आणणे ──
+  // ── पेज रिफ्रेश झाल्यावर फाईल आणणे ──
   async getCurrentUser() {
     const response = await fetch(`${API_BASE}/me`, {
       method: 'GET',
       headers: { 
-        'Authorization': getSecurityPass() // पास सोबत पाठवणे सक्तीचे आहे
+        'Authorization': getSecurityPass() 
       }
     });
     if (!response.ok) throw new Error('शेतकऱ्याची माहिती मिळाली नाही');
     return await response.json();
   },
   
-  // २. बाजारभाव आणणे (इथे पास दाखवणे सक्तीचे आहे)
+  // २. बाजारभाव आणणे
   async getMarketData(crop, district) {
     const response = await fetch(`${API_BASE}/market?crop=${crop}&district=${district}`, {
       headers: { 'Authorization': getSecurityPass() }
@@ -39,21 +39,23 @@ export const apiService = {
     return await response.json();
   },
 
-  // ३. व्हॉइस कॅसेट पाठवणे
-  async processVoiceCommand(audioBlob, user, activeCrop) {
+  // ३. व्हॉइस कॅसेट पाठवणे (Updated for Crop Stage & Area)
+  async processVoiceCommand(audioBlob, user, activeCycle) {
     const formData = new FormData();
     formData.append('voice', audioBlob, 'recording.webm');
     formData.append('farmerId', user.id);
     formData.append('name', user.name || '');
     formData.append('district', user.district || '');
-    formData.append('activeCrop', activeCrop || '');
     formData.append('isProfileComplete', user.isProfileComplete || false); 
+    
+    // 🟢 नवीन: पिकाचे वय आणि क्षेत्र AI ला पाठवणे
+    formData.append('activeCrop', activeCycle?.crop || '');
+    formData.append('cropStartDate', activeCycle?.startDate || '');
+    formData.append('cropArea', activeCycle?.area || '');
 
     const response = await fetch(`${API_BASE}/chat`, {
       method: 'POST',
-      headers: { 
-        'Authorization': getSecurityPass() // पास सोबत पाठवा
-      },
+      headers: { 'Authorization': getSecurityPass() },
       body: formData
     });
     
@@ -61,26 +63,28 @@ export const apiService = {
     return await response.json();
   },
 
-  async processTextCommand(text, imageFile, user, activeCrop, language) {
+  // ४. मजकूर आणि फोटो पाठवणे (Updated for Crop Stage & Area)
+  async processTextCommand(text, imageFile, user, activeCycle, language) {
     const formData = new FormData();
     formData.append('text', text);
     formData.append('farmerId', user.id);
     formData.append('name', user.name || '');
     formData.append('district', user.district || '');
-    formData.append('activeCrop', activeCrop || '');
     formData.append('isProfileComplete', user.isProfileComplete || false);
-    formData.append('language', language || 'mr-IN'); // शेतकऱ्याची आवडती भाषा
+    formData.append('language', language || 'mr-IN'); 
 
-    // जर फोटो असेल तर तोही जोडा
+    // 🟢 नवीन: पिकाचे वय आणि क्षेत्र AI ला पाठवणे
+    formData.append('activeCrop', activeCycle?.crop || '');
+    formData.append('cropStartDate', activeCycle?.startDate || '');
+    formData.append('cropArea', activeCycle?.area || '');
+
     if (imageFile) {
       formData.append('image', imageFile);
     }
 
     const response = await fetch(`${API_BASE}/chat`, {
       method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${localStorage.getItem('farmerToken')}` // सिक्युरिटी पास
-      },
+      headers: { 'Authorization': getSecurityPass() },
       body: formData
     });
     
@@ -88,17 +92,32 @@ export const apiService = {
     return await response.json();
   },
 
-  // ४. पावती जमा करणे
+  // ५. पावती जमा करणे
   async addLedgerEntry(ledgerEntry, updatedUser) {
     const response = await fetch(`${API_BASE}/ledger`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': getSecurityPass() // पास सोबत पाठवा
+        'Authorization': getSecurityPass() 
       },
       body: JSON.stringify({ ledgerEntry, updatedUser })
     });
     if (!response.ok) throw new Error('पावती जमा करता आली नाही');
+    return await response.json();
+  },
+
+  // ── नवीन: फीडबॅक सेव्ह करणे (Feedback API) ──
+  async sendFeedback(chatId, farmerId, feedbackType) {
+    const response = await fetch(`${API_BASE}/feedback`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': getSecurityPass() 
+      },
+      body: JSON.stringify({ chatId, farmerId, feedbackType })
+    });
+    // जरी एरर आली तरी आपण UI थांबवणार नाही, म्हणून फक्त रिझल्ट परत पाठवू
+    if (!response.ok) return { success: false };
     return await response.json();
   },
 
@@ -140,8 +159,6 @@ export const apiService = {
 
   // प्रोफाईल अपडेट करणे
   async updateProfile(userId, profileData) {
-    // खऱ्या अ‍ॅपमध्ये हे बॅकएंडला जाईल: fetch(`${API_BASE}/user/${userId}`, { method: 'PUT', ... })
-    // सध्या आपण UI चालण्यासाठी तात्पुरते 'Success' पाठवत आहोत
     return new Promise((resolve) => setTimeout(() => resolve({ success: true, data: profileData }), 500));
   },
 

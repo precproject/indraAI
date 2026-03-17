@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiService } from '../services/apiService';
-import { locationService } from '../services/locationService';
+import { locationService } from '../services/locationService'; // जर लोकेशन सर्व्हिस वापरणार असाल तर ठेवा
 
 const AppContext = createContext();
 
@@ -8,35 +8,32 @@ export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [cycles, setCycles] = useState([]);
   const [ledger, setLedger] = useState([]);
-  // We start loading as true, so the guard waits while we check the pockets
   const [isLoading, setIsLoading] = useState(true); 
 
-  // ── पेज रिफ्रेश झाल्यावर फाईल परत आणणे ──
+  // ── १. पेज रिफ्रेश झाल्यावर फाईल परत आणणे ──
   useEffect(() => {
     const restoreSession = async () => {
       const token = localStorage.getItem('farmerToken');
       
       if (token) {
         try {
-          // जर पास असेल, तर बॅकएंडवरून शेतकऱ्याची पूर्ण फाईल आणा
           const data = await apiService.getCurrentUser();
           setUser(data.user);
           setCycles(data.cycles || []);
           setLedger(data.ledger || []);
         } catch (error) {
           console.error("पास जुना झाला आहे किंवा चुकीचा आहे:", error);
-          // पास चालत नसेल, तर तो फाडून टाका (Logout)
           localStorage.removeItem('farmerToken');
           setUser(null);
         }
       }
-      setIsLoading(false); // फाईल शोधण्याचे काम संपले
+      setIsLoading(false);
     };
 
     restoreSession();
   }, []);
 
-// ── नवीन लॉगिन ──
+  // ── २. नवीन लॉगिन ──
   const loginUser = async (phoneNumber, district) => {
     setIsLoading(true);
     try {
@@ -45,8 +42,6 @@ export const AppProvider = ({ children }) => {
       setUser(data.user);
       setCycles(data.cycles || []);
       setLedger(data.ledger || []);
-
-      // मिळालेला पास सुरक्षित ठेवा
       localStorage.setItem('farmerToken', data.token);
       
       return data.user;
@@ -69,6 +64,8 @@ export const AppProvider = ({ children }) => {
     setUser((prev) => ({ ...prev, ...newData }));
   };
   
+  // ── ३. हाताने भरलेली नोंद (Manual Entry API) ──
+  // हे फंक्शन तेव्हाच वापरायचे जेव्हा शेतकरी हाताने फॉर्म भरून हिशोब टाकेल
   const addLedgerEntry = async (newEntry) => {
     if (!user) return; 
 
@@ -90,10 +87,27 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // ── 🚀 ४. नवीन: लोकल अपडेट्स (Smart AI साठी) ──
+  // जेव्हा बॅकएंड स्वतः DB मध्ये नोंद करतो, तेव्हा UI अपडेट करण्यासाठी फक्त हे फंक्शन्स वापरायचे
+
+  const addLocalLedgerEntry = (entry) => {
+    setLedger((prev) => [entry, ...prev]);
+  };
+
+  const addLocalCycle = (cycle) => {
+    setCycles((prev) => [cycle, ...prev]);
+  };
+
+  const addCredits = (points) => {
+    if (!points) return;
+    setUser((prev) => ({ ...prev, credits: (prev?.credits || 0) + points }));
+  };
+
   return (
     <AppContext.Provider value={{ 
       user, cycles, ledger, isLoading, 
-      loginUser, logoutUser, updateUserProfile, addLedgerEntry 
+      loginUser, logoutUser, updateUserProfile, addLedgerEntry,
+      addLocalLedgerEntry, addLocalCycle, addCredits // नवीन फंक्शन्स बाहेर पाठवली
     }}>
       {children}
     </AppContext.Provider>
