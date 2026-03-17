@@ -1,9 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing';
+import Login from './pages/Login';
 import FarmerApp from './pages/FarmerApp';
 import CompanyDashboard from './pages/CompanyDashboard';
-import SetupWizard from './pages/SetupWizard';
+//import SetupWizard from './pages/SetupWizard';
 import { AppProvider } from './context/AppContext';
 
 function App() {
@@ -12,7 +13,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/setup" element={<SetupWizard />} />
+          <Route path="/login" element={<Login />} />
+          {/*<Route path="/setup" element={<SetupWizard />} />*/}
           <Route path="/app" element={<FarmerApp />} />
           <Route path="/dashboard" element={<CompanyDashboard />} />
         </Routes>

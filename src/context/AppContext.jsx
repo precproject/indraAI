@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { dbService } from '../services/firebase';
+import { apiService } from '../services/apiService';
+import { locationService } from '../services/locationService';
 
 const AppContext = createContext();
 
@@ -7,59 +8,70 @@ export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [cycles, setCycles] = useState([]);
   const [ledger, setLedger] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // We start loading as true, so the guard waits while we check the pockets
+  const [isLoading, setIsLoading] = useState(true); 
 
-  // When the app opens, the manager fetches the files from the cloud safe
+  // ── पेज रिफ्रेश झाल्यावर फाईल परत आणणे ──
   useEffect(() => {
-    const fetchRealFiles = async () => {
-      try {
-        // We look for our primary farmer. If they don't exist, we create a starting profile.
-        let userData = await dbService.getDocumentById('users', 'primary_farmer');
-        
-        if (!userData) {
-          userData = {
-            id: 'primary_farmer',
-            name: 'राजेश पाटील',
-            phone: '+91 98765 43210',
-            village: 'लासलगाव',
-            taluka: 'निफाड',
-            district: 'नाशिक',
-            credits: 340,
-            nextMilestone: 500
-          };
-          await dbService.saveDocument('users', userData);
+    const restoreSession = async () => {
+      const token = localStorage.getItem('farmerToken');
+      
+      if (token) {
+        try {
+          // जर पास असेल, तर बॅकएंडवरून शेतकऱ्याची पूर्ण फाईल आणा
+          const data = await apiService.getCurrentUser();
+          setUser(data.user);
+          setCycles(data.cycles || []);
+          setLedger(data.ledger || []);
+        } catch (error) {
+          console.error("पास जुना झाला आहे किंवा चुकीचा आहे:", error);
+          // पास चालत नसेल, तर तो फाडून टाका (Logout)
+          localStorage.removeItem('farmerToken');
+          setUser(null);
         }
-        setUser(userData);
-
-        // Fetch their specific crop cycles and receipts
-        const userCycles = await dbService.getDocumentsByField('cycles', 'farmerId', userData.id);
-        const userLedger = await dbService.getDocumentsByField('ledger', 'farmerId', userData.id);
-        
-        // If they have no cycles, give them a starting one so the app isn't empty
-        if (userCycles.length === 0) {
-          const newCycle = {
-            id: 'c1', farmerId: userData.id, crop: 'कांदा', land: 'घरची शेती', area: 2, season: 'खरीप २०२४', status: 'active', currentPhase: 'वाढ', income: 0, expense: 0, sowingDate: new Date().toISOString().slice(0,10)
-          };
-          await dbService.saveDocument('cycles', newCycle);
-          setCycles([newCycle]);
-        } else {
-          setCycles(userCycles);
-        }
-
-        setLedger(userLedger.sort((a, b) => new Date(b.date) - new Date(a.date)));
-      } catch (error) {
-        console.error("Failed to open the filing cabinet:", error);
-      } finally {
-        setIsLoading(false);
       }
+      setIsLoading(false); // फाईल शोधण्याचे काम संपले
     };
 
-    fetchRealFiles();
+    restoreSession();
   }, []);
 
-  // The action to add a real receipt to the cloud safe
+// ── नवीन लॉगिन ──
+  const loginUser = async (phoneNumber, district) => {
+    setIsLoading(true);
+    try {
+      const data = await apiService.loginUser(phoneNumber, district);
+      
+      setUser(data.user);
+      setCycles(data.cycles || []);
+      setLedger(data.ledger || []);
+
+      // मिळालेला पास सुरक्षित ठेवा
+      localStorage.setItem('farmerToken', data.token);
+      
+      return data.user;
+    } catch (error) {
+      console.error("लॉगिन अयशस्वी:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logoutUser = () => {
+    setUser(null);
+    setCycles([]);
+    setLedger([]);
+    localStorage.removeItem('farmerToken'); 
+  };
+
+  const updateUserProfile = (newData) => {
+    setUser((prev) => ({ ...prev, ...newData }));
+  };
+  
   const addLedgerEntry = async (newEntry) => {
-    // 1. Put it on the desk instantly so the farmer sees it immediately
+    if (!user) return; 
+
     const entryWithDate = {
       ...newEntry,
       farmerId: user.id,
@@ -68,18 +80,21 @@ export const AppProvider = ({ children }) => {
     };
     
     setLedger((prev) => [entryWithDate, ...prev]);
-
-    // 2. Add reward points for being a good record keeper
-    const updatedUser = { ...user, credits: user.credits + 15 };
+    const updatedUser = { ...user, credits: (user.credits || 0) + 15 };
     setUser(updatedUser);
 
-    // 3. Quietly file everything in the permanent cloud safe
-    await dbService.saveDocument('ledger', entryWithDate);
-    await dbService.saveDocument('users', updatedUser);
+    try {
+      await apiService.addLedgerEntry(entryWithDate, updatedUser);
+    } catch (error) {
+      console.error("Failed to send receipt to headquarters:", error);
+    }
   };
 
   return (
-    <AppContext.Provider value={{ user, cycles, ledger, isLoading, addLedgerEntry }}>
+    <AppContext.Provider value={{ 
+      user, cycles, ledger, isLoading, 
+      loginUser, logoutUser, updateUserProfile, addLedgerEntry 
+    }}>
       {children}
     </AppContext.Provider>
   );
