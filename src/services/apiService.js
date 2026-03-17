@@ -1,4 +1,9 @@
-const API_BASE = 'http://localhost:3000/api'; 
+// const API_BASE = 'http://localhost:3000/api'; 
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+const API_BASE = isLocalhost 
+  ? 'http://localhost:3001/api' 
+  : 'https://indraai-backend.vercel.app/api';
 
 // खिशातून (LocalStorage) सिक्युरिटी पास काढण्याची सोय
 const getSecurityPass = () => {
