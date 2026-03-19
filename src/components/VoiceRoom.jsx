@@ -50,14 +50,19 @@ const VoiceRoom = () => {
 
   const handleFeedback = async (messageIndex, type) => {
     const updatedHistory = [...chatHistory];
-    updatedHistory[messageIndex].feedback = type;
+    const targetMessage = updatedHistory[messageIndex];
+    // updatedHistory[messageIndex].feedback = type;
+    targetMessage.feedback = type;
     setChatHistory(updatedHistory);
     
-    try {
-      await apiService.sendFeedback('chat_' + Date.now(), user.id, type);
-      console.log(`Feedback saved: ${type}`);
-    } catch (e) {
-      console.warn("Feedback API not ready yet");
+    // 🟢 खरा chatId बॅकएंडला पाठवा
+    if (targetMessage.chatId) {
+      try {
+        await apiService.sendFeedback(targetMessage.chatId, type);
+        console.log(`Feedback saved: ${targetMessage.chatId}`);
+      } catch (e) {
+        console.warn("Feedback save failed");
+      }
     }
   };
 
@@ -84,7 +89,7 @@ const VoiceRoom = () => {
 
     try {
       const activeCycle = cycles.length > 0 ? cycles[0] : null;
-      const result = await apiService.processTextCommand(currentText, imageFile, user, activeCycle, selectedLang);
+      const result = await apiService.processTextCommand(currentText, imageFile, selectedLang);
 
       const aiMessage = {
         sender: 'ai',
@@ -93,6 +98,7 @@ const VoiceRoom = () => {
         tip: result.tip,
         audioContent: result.audioContent,
         voice_text: result.voice_text,
+        chatId: result.chatId, // 🟢 बॅकएंडकडून आलेला ID सेव्ह करा
         feedback: null
       };
       

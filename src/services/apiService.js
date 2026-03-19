@@ -45,18 +45,10 @@ export const apiService = {
   },
 
   // ३. व्हॉइस कॅसेट पाठवणे (Updated for Crop Stage & Area)
-  async processVoiceCommand(audioBlob, user, activeCycle) {
+  async processVoiceCommand(audioBlob, language) {
     const formData = new FormData();
     formData.append('voice', audioBlob, 'recording.webm');
-    formData.append('farmerId', user.id);
-    formData.append('name', user.name || '');
-    formData.append('district', user.district || '');
-    formData.append('isProfileComplete', user.isProfileComplete || false); 
-    
-    // 🟢 नवीन: पिकाचे वय आणि क्षेत्र AI ला पाठवणे
-    formData.append('activeCrop', activeCycle?.crop || '');
-    formData.append('cropStartDate', activeCycle?.startDate || '');
-    formData.append('cropArea', activeCycle?.area || '');
+    formData.append('language', language || 'mr-IN');
 
     const response = await fetch(`${API_BASE}/chat`, {
       method: 'POST',
@@ -69,19 +61,10 @@ export const apiService = {
   },
 
   // ४. मजकूर आणि फोटो पाठवणे (Updated for Crop Stage & Area)
-  async processTextCommand(text, imageFile, user, activeCycle, language) {
+  async processTextCommand(text, imageFile, language) {
     const formData = new FormData();
     formData.append('text', text);
-    formData.append('farmerId', user.id);
-    formData.append('name', user.name || '');
-    formData.append('district', user.district || '');
-    formData.append('isProfileComplete', user.isProfileComplete || false);
     formData.append('language', language || 'mr-IN'); 
-
-    // 🟢 नवीन: पिकाचे वय आणि क्षेत्र AI ला पाठवणे
-    formData.append('activeCrop', activeCycle?.crop || '');
-    formData.append('cropStartDate', activeCycle?.startDate || '');
-    formData.append('cropArea', activeCycle?.area || '');
 
     if (imageFile) {
       formData.append('image', imageFile);
@@ -112,14 +95,14 @@ export const apiService = {
   },
 
   // ── नवीन: फीडबॅक सेव्ह करणे (Feedback API) ──
-  async sendFeedback(chatId, farmerId, feedbackType) {
+  async sendFeedback(chatId, feedbackType) {
     const response = await fetch(`${API_BASE}/feedback`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': getSecurityPass() 
       },
-      body: JSON.stringify({ chatId, farmerId, feedbackType })
+      body: JSON.stringify({ chatId, feedbackType })
     });
     // जरी एरर आली तरी आपण UI थांबवणार नाही, म्हणून फक्त रिझल्ट परत पाठवू
     if (!response.ok) return { success: false };
