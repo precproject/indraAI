@@ -2,7 +2,7 @@
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 const API_BASE = isLocalhost 
-  ? 'http://localhost:3001/api' 
+  ? 'http://localhost:3000/api' 
   : 'https://indraai-backend.vercel.app/api';
 
 // खिशातून (LocalStorage) सिक्युरिटी पास काढण्याची सोय
@@ -163,8 +163,19 @@ export const apiService = {
   },
 
   // प्रोफाईल अपडेट करणे
+// प्रोफाईल अपडेट करणे (खरा API कॉल)
   async updateProfile(userId, profileData) {
-    return new Promise((resolve) => setTimeout(() => resolve({ success: true, data: profileData }), 500));
+    const response = await fetch(`${API_BASE}/user/profile`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': getSecurityPass() 
+      },
+      body: JSON.stringify({ userId, ...profileData })
+    });
+    
+    if (!response.ok) throw new Error('प्रोफाईल सेव्ह करता आले नाही');
+    return await response.json();
   },
 
   // नवीन शेत जोडणे
