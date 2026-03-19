@@ -84,11 +84,13 @@ const VoiceRoom = () => {
     
     setRadioState('thinking');
     const currentText = manualText; 
+    const currentImageFile = imageFile;
+    const currentImagePreview = imagePreview;
+    
     setManualText(''); 
     removeImage(); 
 
     try {
-      const activeCycle = cycles.length > 0 ? cycles[0] : null;
       const result = await apiService.processTextCommand(currentText, imageFile, selectedLang);
 
       const aiMessage = {
@@ -126,8 +128,25 @@ const VoiceRoom = () => {
 
     } catch (error) {
       console.error("Processing error:", error);
-      setChatHistory(prev => [...prev, { sender: 'ai', text: 'माफी असावी, तांत्रिक अडचण आली आहे. कृपया पुन्हा प्रयत्न करा.' }]);
+
+      // 🟢 २. एरर मेसेज तयार करणे (भाषेनुसार)
+      const errorMsg = selectedLang === 'hi-IN' 
+        ? 'माफ़ करना, मुझे ठीक से समझ नहीं आया। कृपया दोबारा कोशिश करें।' 
+        : 'माफी असावी, मला नीट समजले नाही. कृपया पुन्हा प्रयत्न करा.';
+
+      setChatHistory(prev => [...prev, { sender: 'ai', text: errorMsg }]);
+
       setRadioState('idle');
+
+      // 🟢 ३. शेतकऱ्याने दिलेला डेटा परत पाटीवर (Input Box) आणणे
+      setManualText(currentText);
+      if (currentImageFile) {
+        setImageFile(currentImageFile);
+        setImagePreview(currentImagePreview);
+      }
+
+      // 🟢 ४. एरर मेसेज 'बोलून' दाखवणे (Fallback TTS चा वापर करून)
+      await apiService.playAudio(errorMsg, null);
     }
   };
 

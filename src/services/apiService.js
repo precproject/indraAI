@@ -137,7 +137,17 @@ export const apiService = {
         await audio.play();
       } else if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(fallbackText);
-        utterance.lang = 'mr-IN';
+        const voices = speechSynthesis.getVoices();
+
+        const voice =
+          voices.find(v => v.lang === "mr-IN") ||
+          voices.find(v => v.lang === "hi-IN");
+
+        if (voice) {
+          utterance.voice = voice;
+        } else {
+          utterance.lang = "mr-IN";
+        }
         window.speechSynthesis.speak(utterance);
       }
     } catch (error) {
