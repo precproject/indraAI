@@ -4,9 +4,13 @@ import { ArrowRight, User, MapPin, Navigation, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { apiService } from '../services/apiService';
 import { useSmartLocation } from '../hooks/useSmartLocation';
+import { useMarathiTranslation } from "../hooks/useMarathiTranslation";
 
 const Onboarding = () => {
   const { user, updateUserProfile } = useAppContext();
+  const { translateToMarathi } = useMarathiTranslation();
+  const [errors, setErrors] = useState({});
+
   const navigate = useNavigate();
   
   const { locationData, isLocating, error: locationError, fetchLocation } = useSmartLocation();
@@ -17,6 +21,16 @@ const Onboarding = () => {
   const [pincode, setPincode] = useState('');
   const [stateName, setStateName] = useState('Maharashtra');
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleTranslateOnBlur = async (value, setter) => {
+    const isEnglish = (text) => /^[A-Za-z\s]+$/.test(text);
+
+    if (!value) return;
+    // Only translate if it's English
+    if (!isEnglish(value)) return;
+    const translated = await translateToMarathi(value);
+    setter(translated);
+  };
 
   // 🟢 १. पेज लोड होताच आपोआप लोकेशनची परवानगी मागणे
   useEffect(() => {
@@ -31,10 +45,18 @@ const Onboarding = () => {
       setPincode(locationData.pincode || '');
       setStateName(locationData.state || 'Maharashtra');
     }
+
+    if(user?.isProfileComplete == true && user?.name!=""){
+        navigate('/app'); 
+    }
   }, [locationData]);
 
   const handleCompleteProfile = async (e) => {
     e.preventDefault();
+
+    // 🔥 Validate first
+    if (!validateFields()) return;
+
     if (!name || !district) return;
     setIsSaving(true);
 
@@ -67,6 +89,43 @@ const Onboarding = () => {
     }
   };
 
+  const validateFields = () => {
+    const newErrors = {};
+
+    // Name
+    if (!name.trim()) {
+      newErrors.name = "नाव आवश्यक आहे";
+    } else if (name.length < 3) {
+      newErrors.name = "नाव किमान ३ अक्षरांचे असावे";
+    } else if (/\d/.test(name)) {
+      newErrors.name = "नावात अंक नसावेत";
+    }
+
+    // District
+    if (!district.trim()) {
+      newErrors.district = "जिल्हा आवश्यक आहे";
+    }
+
+    // State
+    if (!stateName.trim()) {
+      newErrors.state = "राज्य आवश्यक आहे";
+    }
+
+    // State
+    if (!village.trim()) {
+      newErrors.village = "गाव आवश्यक आहे";
+    }
+
+    // Pincode
+    if (pincode && !/^\d{6}$/.test(pincode)) {
+      newErrors.pincode = "पिनकोड ६ अंकी असावा";
+    }
+
+    setErrors(newErrors);
+
+    return Object.keys(newErrors).length === 0;
+  };
+
   return (
     <div className="min-h-screen bg-[#fdf8f0] flex flex-col items-center justify-center p-6 font-sans">
       <div className="w-full max-w-sm">
@@ -84,10 +143,14 @@ const Onboarding = () => {
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onBlur={() => handleTranslateOnBlur(name, setName)}
                 placeholder="तुमचे पूर्ण नाव"
                 className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-2xl pl-12 pr-4 py-3.5 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
                 required
               />
+              {errors.name && (
+                <p className="text-xs text-red-500 mt-1 font-bold">{errors.name}</p>
+              )}
             </div>
 
             <button
@@ -109,9 +172,13 @@ const Onboarding = () => {
                   type="text" 
                   value={village}
                   onChange={(e) => setVillage(e.target.value)}
+                  onBlur={() => handleTranslateOnBlur(village, setVillage)}
                   placeholder="गाव"
                   className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
                 />
+                {errors.village && (
+                  <p className="text-xs text-red-500 mt-1 font-bold">{errors.village}</p>
+                )}
               </div>
               <div>
                 <label className="text-[10px] font-bold text-[#8b5e3c] ml-1 uppercase tracking-widest">पिनकोड</label>
@@ -123,6 +190,9 @@ const Onboarding = () => {
                   maxLength={6}
                   className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
                 />
+                {errors.pincode && (
+                  <p className="text-xs text-red-500 mt-1 font-bold">{errors.pincode}</p>
+                )}
               </div>
             </div>
 
@@ -134,10 +204,31 @@ const Onboarding = () => {
                 type="text" 
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
+                onBlur={() => handleTranslateOnBlur(district, setDistrict)}
                 placeholder="तुमचा जिल्हा (उदा. नाशिक)"
                 className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-2xl pl-12 pr-4 py-3.5 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
                 required
               />
+              {errors.district && (
+                <p className="text-xs text-red-500 mt-1 font-bold">{errors.district}</p>
+              )}
+            </div>
+
+            <div className="relative mt-2">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <MapPin size={20} className="text-[#8b5e3c]/50" />
+              </div>
+              <input 
+                type="text" 
+                value={stateName}
+                onChange={(e) => setStateName(e.target.value)}
+                onBlur={() => handleTranslateOnBlur(stateName, setStateName)}
+                placeholder="राज्य (उदा. महाराष्ट्र)"
+                className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-2xl pl-12 pr-4 py-3.5 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
+              />
+              {errors.state && (
+                <p className="text-xs text-red-500 mt-1 font-bold">{errors.state}</p>
+              )}
             </div>
 
             <button 

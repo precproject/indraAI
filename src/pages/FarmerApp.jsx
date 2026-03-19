@@ -23,6 +23,10 @@ const FarmerApp = () => {
     if (!token) {
       navigate('/login', { replace: true });
     }
+
+    if(user?.isProfileComplete == false || user?.name ==''){
+        navigate('/onboarding'); 
+    }
   }, [navigate]);
 
   // जोपर्यंत 'AppContext' मधून शेतकऱ्याची माहिती (user) येत नाही, तोपर्यंत स्क्रीन रिकामी (blank) ठेवा.
