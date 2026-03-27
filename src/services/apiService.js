@@ -183,5 +183,14 @@ export const apiService = {
       { id: 2, date: new Date().toISOString().slice(0, 10), reason: 'खताचा हिशोब जोडला', points: 15 },
       { id: 3, date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), reason: 'शेतातील कामाची नोंद', points: 10 }
     ]), 600));
-  }
+  },
+
+  // 🟢 Cycle Room साठी विशिष्ट पिकाचा हिशोब आणि संवाद आणणे
+  async getCropTimeline(cropName) {
+    const response = await fetch(`${API_BASE}/cycles/timeline?crop=${cropName}`, {
+      headers: { 'Authorization': getSecurityPass() }
+    });
+    if (!response.ok) return { ledger: [], chats: [] };
+    return await response.json();
+  },
 };

@@ -10,6 +10,8 @@ export const AppProvider = ({ children }) => {
   const [ledger, setLedger] = useState([]);
   const [isLoading, setIsLoading] = useState(true); 
 
+  const [chatHistory, setChatHistory] = useState([]);
+
   // ── १. पेज रिफ्रेश झाल्यावर फाईल परत आणणे ──
   useEffect(() => {
     const restoreSession = async () => {
@@ -105,7 +107,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{ 
-      user, cycles, ledger, isLoading, 
+      user, cycles, ledger, isLoading, chatHistory, setChatHistory,
       loginUser, logoutUser, updateUserProfile, addLedgerEntry,
       addLocalLedgerEntry, addLocalCycle, addCredits // नवीन फंक्शन्स बाहेर पाठवली
     }}>

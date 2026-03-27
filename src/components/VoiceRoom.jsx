@@ -7,7 +7,7 @@ import { useNativeSpeech } from '../hooks/useNativeSpeech';
 
 const VoiceRoom = () => {
   // 🟢 दुरुस्ती: addLocalLedgerEntry आणि addCredits इथे घेतले आहेत!
-  const { user, cycles, ledger, addLedgerEntry, updateUserProfile, addLocalLedgerEntry, addCredits } = useAppContext();
+  const { user, cycles, ledger, addLedgerEntry, updateUserProfile, addLocalLedgerEntry, addCredits, chatHistory, setChatHistory } = useAppContext();
   
   // 🟢 Feature Toggles (सेटिंग्ज)
   const ENABLE_ICEBREAKER = false; // Icebreaker बंद करण्यासाठी false करा
@@ -17,7 +17,7 @@ const VoiceRoom = () => {
   const [suggestions, setSuggestions] = useState([]); // 🟢 स्मार्ट प्रश्नांसाठी
 
   // ── 1. संवादाची सलग नोंद (Session Chat History) ──
-  const [chatHistory, setChatHistory] = useState([]); 
+  //const [chatHistory, setChatHistory] = useState([]); 
   const chatEndRef = useRef(null); 
 
   const [radioState, setRadioState] = useState('idle');
