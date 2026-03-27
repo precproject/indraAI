@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, MapPin, Award, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, Building2 } from 'lucide-react';
+import { TrendingUp, MapPin, Award, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, Building2, Clock } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAppContext } from '../context/AppContext';
 
@@ -8,73 +8,47 @@ const MarketRoom = () => {
   const { user, cycles } = useAppContext();
   
   const [selectedCrop, setSelectedCrop] = useState('');
-  const [marketData, setMarketData] = useState([]); // आता हा कायम Array असेल!
+  const [marketData, setMarketData] = useState([]); 
   const [isLoading, setIsLoading] = useState(true);
+  
+  // 🟢 नवीन: शेवटच्या अपडेटची वेळ साठवण्यासाठी
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // ── १. शेतकऱ्याच्या पिकांवरून टॅब्स ठरवणे ──
   const farmerCrops = cycles && cycles.length > 0 
     ? Array.from(new Set(cycles.map(c => c.crop))) 
     : ['कांदा', 'सोयाबीन', 'कापूस', 'टोमॅटो'];
 
-  // सुरुवातीला पहिले पीक आपोआप निवडणे
   useEffect(() => {
     if (!selectedCrop && farmerCrops.length > 0) {
       setSelectedCrop(farmerCrops[0]);
     }
   }, [cycles, selectedCrop, farmerCrops]);
 
-  // ── २. डेटा आणणे (Real API + Mock Fallback) ──
+  // ── २. फक्त खरा डेटा आणणे (No Mock Data) ──
   const fetchMarketData = async (crop) => {
     if (!crop) return;
     setIsLoading(true);
     
     try {
       const userDistrict = user?.district || 'पुणे';
-      
-      // 🌐 भविष्यातील Agmarknet API इंटिग्रेशनसाठी येथे बदल करा:
-      // const response = await fetch(`https://api.agmarknet.gov.in/prices?crop=${crop}&district=${userDistrict}`);
-      // const data = await response.json();
-      
-      // सध्या आपण आपल्या लोकल बॅकएंडला कॉल करत आहोत
       const data = await apiService.getMarketData(crop, userDistrict);
       
-      // जर बॅकएंडने खरा डेटा दिला असेल (Array मध्ये)
       if (Array.isArray(data) && data.length > 0) {
         setMarketData(data);
       } else {
-        // डेटा नसेल तर 'Mock Data' वापरा
-        loadMockData(crop);
+        setMarketData([]); // डेटा नसेल तर रिकामी यादी
       }
+      setLastUpdated(new Date()); // वेळ अपडेट करा
     } catch (error) {
-      console.warn("Market API failed, using local mock data...");
-      loadMockData(crop); 
+      console.warn("Market API failed:", error);
+      setMarketData([]); 
+      setLastUpdated(new Date());
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ── ३. नमुना डेटा (Mock Data Fallback) ──
-  // हा डेटा हुबेहूब तुमच्या बॅकएंडच्या (Agmarknet च्या) फॉरमॅटमध्ये बनवला आहे
-  const loadMockData = (crop) => {
-    const allMockData = {
-      'कांदा': [
-        { market: 'पिंपळगाव', avg: 2200, min: 2000, max: 2700, dist: 'नाशिक', source: 'सरकारी बाजार समिती', trend: 50 },
-        { market: 'लासलगाव', avg: 2100, min: 1900, max: 2400, dist: 'नाशिक', source: 'सरकारी बाजार समिती', trend: -100 },
-        { market: 'पुणे', avg: 1900, min: 1800, max: 2000, dist: 'पुणे', source: 'स्थानिक शेतकरी', trend: 150 }
-      ],
-      'सोयाबीन': [
-        { market: 'नागपूर', avg: 5400, min: 5100, max: 5800, dist: 'नागपूर', source: 'सरकारी बाजार समिती', trend: 200 },
-        { market: 'लातूर', avg: 5200, min: 5050, max: 5550, dist: 'लातूर', source: 'कृषी उत्पन्न बाजार', trend: -50 }
-      ],
-      'कापूस': [
-        { market: 'औरंगाबाद', avg: 6800, min: 6500, max: 7200, dist: 'औरंगाबाद', source: 'सरकारी बाजार समिती', trend: 300 }
-      ]
-    };
-
-    setMarketData(allMockData[crop] || []);
-  };
-
-  // पीक बदलल्यावर किंवा रिफ्रेश केल्यावर डेटा पुन्हा आणा
   useEffect(() => {
     if (selectedCrop) {
       fetchMarketData(selectedCrop);
@@ -83,11 +57,15 @@ const MarketRoom = () => {
 
   const handleRefresh = () => fetchMarketData(selectedCrop);
 
-  // ── ४. आकडेवारी आणि सॉर्टिंग (Sorting Array) ──
-  // आलेल्या Array ला भावानुसार (avg) उतरत्या क्रमाने लावणे
+  // वेळेचे स्वरूप (Formatting Time)
+  const formatTime = (date) => {
+    if (!date) return '';
+    return date.toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // ── ३. आकडेवारी आणि सॉर्टिंग ──
   const sortedMarkets = [...marketData].sort((a, b) => b.avg - a.avg);
   const bestMarket = sortedMarkets.length > 0 ? sortedMarkets[0] : null;
-  
   const lowestPrice = sortedMarkets.length > 0 ? Math.min(...sortedMarkets.map(m => m.avg)) : 0;
   const priceRange = bestMarket ? bestMarket.avg - lowestPrice : 0;
 
@@ -100,11 +78,21 @@ const MarketRoom = () => {
           <h2 className="text-2xl font-black text-[#2c1810] flex items-center gap-2">
             <TrendingUp className="text-[#4a9e4a]" size={28} /> बाजारभाव
           </h2>
-          <p className="text-sm font-bold text-[#8b5e3c] mt-1 tracking-wide flex items-center gap-1">
-            <MapPin size={12}/> {user?.district || 'महाराष्ट्र'} परिसरातील ताजे भाव
-          </p>
+          <div className="flex flex-col gap-1 mt-1">
+            <p className="text-sm font-bold text-[#8b5e3c] tracking-wide flex items-center gap-1">
+              <MapPin size={12}/> {user?.district || 'महाराष्ट्र'} परिसरातील ताजे भाव
+            </p>
+            {/* 🟢 नवीन: Last Updated Time */}
+            {lastUpdated && (
+              <p className="text-[10px] font-bold text-[#8b5e3c]/60 flex items-center gap-1">
+                <Clock size={10} /> शेवटचे अपडेट: आज, {formatTime(lastUpdated)}
+              </p>
+            )}
+          </div>
         </div>
-        <button onClick={handleRefresh} disabled={isLoading} className="p-2 bg-white rounded-full border border-[#d4a853]/30 text-[#8b5e3c] hover:bg-[#d4edda] transition-colors shadow-sm">
+        
+        {/* Top Refresh Button */}
+        <button onClick={handleRefresh} disabled={isLoading} className="p-2 bg-white rounded-full border border-[#d4a853]/30 text-[#8b5e3c] hover:bg-[#d4edda] transition-colors shadow-sm mt-1">
           <RefreshCw size={20} className={isLoading ? "animate-spin text-[#4a9e4a]" : ""} />
         </button>
       </div>
@@ -128,12 +116,30 @@ const MarketRoom = () => {
 
       {/* ── CONTENT AREA ── */}
       {isLoading ? (
-        <div className="flex justify-center py-8"><span className="animate-spin text-3xl">⏳</span></div>
+        <div className="flex justify-center py-12"><span className="animate-spin text-4xl">⏳</span></div>
       ) : sortedMarkets.length === 0 ? (
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start gap-3">
-           <AlertCircle className="text-orange-400 shrink-0 mt-0.5" size={20} />
-           <p className="text-sm text-orange-800 font-bold">सध्या '{selectedCrop}' चे बाजारभाव उपलब्ध नाहीत. इतर शेतकऱ्यांनी नोंद केल्यावर ते इथे दिसतील.</p>
-        </div>
+        
+        /* 🟢 नवीन: No Data UI with Big Refresh Button */
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center mt-6 p-8 bg-white border border-[#d4a853]/30 rounded-[2rem] shadow-sm text-center"
+        >
+          <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-4 border border-orange-100">
+            <AlertCircle className="text-orange-400" size={32} />
+          </div>
+          <h3 className="text-lg font-black text-[#2c1810] mb-2">माहिती उपलब्ध नाही</h3>
+          <p className="text-sm text-[#8b5e3c] font-bold mb-6 leading-relaxed">
+            सध्या <span className="text-[#5c3317] border-b border-[#d4a853] px-1">'{selectedCrop}'</span> चे ताजे बाजारभाव उपलब्ध नाहीत. इतर शेतकऱ्यांनी त्यांच्या विक्रीची नोंद केल्यावर ते इथे दिसतील.
+          </p>
+          <button
+            onClick={handleRefresh}
+            className="px-6 py-3 bg-[#fdf8f0] border border-[#d4a853]/50 text-[#5c3317] font-bold rounded-full hover:bg-[#d4edda] transition-colors flex items-center gap-2 shadow-sm active:scale-95"
+          >
+            <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
+            पुन्हा तपासा (Refresh)
+          </button>
+        </motion.div>
+
       ) : (
         <>
           {/* ── THE GOLDEN TICKET (Best Market) ── */}
@@ -188,7 +194,7 @@ const MarketRoom = () => {
               <div className="space-y-4">
                 <AnimatePresence mode="wait">
                   {sortedMarkets.map((market, idx) => {
-                    if (idx === 0) return null; // सर्वोत्तम बाजार आधीच वर दाखवला आहे
+                    if (idx === 0) return null; 
                     
                     const fillPercentage = priceRange === 0 ? 100 : ((market.avg - lowestPrice) / priceRange) * 100;
 
@@ -214,11 +220,6 @@ const MarketRoom = () => {
                           </div>
                           <div className="text-right">
                             <p className="font-black text-xl text-[#5c3317]">₹{market.avg.toLocaleString('en-IN')}</p>
-                            {market.trend && (
-                              <p className={`text-[10px] font-bold flex items-center justify-end gap-0.5 mt-1 ${market.trend > 0 ? 'text-[#4a9e4a]' : 'text-red-500'}`}>
-                                {market.trend > 0 ? <ArrowUpRight size={12}/> : <ArrowDownRight size={12}/>} ₹{Math.abs(market.trend)}
-                              </p>
-                            )}
                           </div>
                         </div>
 
