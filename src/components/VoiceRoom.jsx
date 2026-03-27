@@ -9,6 +9,13 @@ const VoiceRoom = () => {
   // 🟢 दुरुस्ती: addLocalLedgerEntry आणि addCredits इथे घेतले आहेत!
   const { user, cycles, ledger, addLedgerEntry, updateUserProfile, addLocalLedgerEntry, addCredits } = useAppContext();
   
+  // 🟢 Feature Toggles (सेटिंग्ज)
+  const ENABLE_ICEBREAKER = false; // Icebreaker बंद करण्यासाठी false करा
+  const ENABLE_SUGGESTIONS = true; // स्मार्ट प्रश्न बंद करण्यासाठी false करा
+
+  const hasIceBreakerFired = useRef(false); // 🟢 IceBreaker ला रोखण्यासाठी
+  const [suggestions, setSuggestions] = useState([]); // 🟢 स्मार्ट प्रश्नांसाठी
+
   // ── 1. संवादाची सलग नोंद (Session Chat History) ──
   const [chatHistory, setChatHistory] = useState([]); 
   const chatEndRef = useRef(null); 
@@ -24,6 +31,71 @@ const VoiceRoom = () => {
   const totalIncome = ledger.filter(e => e.type === 'income').reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const totalExpense = ledger.filter(e => e.type === 'expense').reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const profit = totalIncome - totalExpense;
+
+  // Smart Suggestions for New User
+  const hasUserSpoken = chatHistory.some(msg => msg.sender === 'user');
+
+  // 🟢 नवीन: Ice Breaker (अ‍ॅप उघडताच आपोआप संवाद सुरू करणे)
+  useEffect(() => {
+    // जर चॅट हिस्ट्री रिकामी असेल आणि युजर लोड झाला असेल
+    if (user && chatHistory.length === 0 && !hasIceBreakerFired.current) {
+      hasIceBreakerFired.current = true; // एका सेकंदात लॉक करा म्हणजे दोनदा कॉल जाणार नाही!
+
+      const triggerIceBreaker = async () => {
+        setRadioState('thinking');
+        try {
+          // आपण AI ला एक छुपा संदेश पाठवत आहोत
+          const hiddenMessage = "नमस्कार,";
+          
+          const activeCycle = cycles.length > 0 ? cycles[0] : null;
+          const result = await apiService.processTextCommand(hiddenMessage, null, selectedLang);
+
+          const aiMessage = {
+            sender: 'ai',
+            text: result.display_text,
+            action: result.action,
+            tip: result.tip,
+            audioContent: result.audioContent,
+            voice_text: result.voice_text,
+            chatId: result.chatId,
+            feedback: null
+          };
+          
+          // इथे आपण युजरचा 'hiddenMessage' हिस्ट्रीमध्ये टाकत नाही आहोत, 
+          // फक्त AI चे उत्तर टाकत आहोत!
+          setChatHistory([aiMessage]);
+          setRadioState('idle');
+
+          await apiService.playAudio(result.voice_text, result.audioContent);
+        } catch (error) {
+          console.error("Icebreaker failed", error);
+          setRadioState('idle');
+        }
+      };
+
+      if(ENABLE_ICEBREAKER){
+        triggerIceBreaker();
+      }
+
+      if(ENABLE_SUGGESTIONS){
+        // 🟢 १. Ice Breaker आणि Smart Suggestions जनरेट करणे
+        // --- स्मार्ट प्रश्न तयार करणे ---
+        const month = new Date().getMonth() + 1;
+        const season = month >= 6 && month <= 10 ? "खरीप" : (month >= 11 || month <= 3 ? "रब्बी" : "उन्हाळी");
+        const dist = user.district || 'तुमच्या';
+        
+        const allPrompts = [
+          `${dist} मध्ये आज हवामान कसे राहील?`,
+          `या ${season} हंगामात कोणते पीक घेणे फायदेशीर ठरेल?`,
+          `सध्या बाजारात कांद्याला काय भाव मिळत आहे?`,
+          `माती परीक्षणासाठी मातीचा नमुना कसा घ्यावा?`,
+          `माझ्या शेताचा हिशोब कसा ठेवायचा?`
+        ];
+        // कोणतेही ३ रँडम प्रश्न निवडा
+        setSuggestions(allPrompts.sort(() => 0.5 - Math.random()).slice(0, 3));
+      }
+    }
+  }, [user, cycles]); // जेव्हा user डेटा उपलब्ध होईल तेव्हाच हे चालेल
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -250,7 +322,12 @@ const VoiceRoom = () => {
 
         <div className={`flex flex-col items-center justify-center opacity-90 transition-all duration-500 ${chatHistory.length === 0 ? 'mt-20' : 'mt-8 mb-4'}`}>
           <button 
-            onClick={toggleListening}
+            type="button"
+            style={{ touchAction: 'manipulation' }} // 🟢 मोबाईलवर टच लगेच नोंदवण्यासाठी
+            onClick={(e) => {
+              e.preventDefault(); // डबल टॅप/झूम रोखण्यासाठी
+              toggleListening();
+            }}
             className={`w-28 h-28 rounded-full flex items-center justify-center shadow-xl transition-all duration-300 ${
               isListening ? 'bg-red-500 scale-110 animate-pulse shadow-[0_0_40px_rgba(239,68,68,0.5)]' : 'bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] hover:scale-105 shadow-[0_10px_25px_rgba(45,106,45,0.4)]'
             }`}
@@ -265,19 +342,37 @@ const VoiceRoom = () => {
         <div ref={chatEndRef} />
       </div>
 
-      {/* ── Unified Input Area ── */}
-      <div className="absolute bottom-4 left-4 right-4 z-20">
+      {/* ── Unified Input Area (Mobile Keyboard Fix) ── ── */}
+      <div className="sticky bottom-0 z-50 w-full px-4 pb-4 pt-8 bg-gradient-to-t from-[#fdf8f0] via-[#fdf8f0] to-[#fdf8f0]/0 shrink-0">
         
+        {/* 🟢 १. Smart Suggestions (फक्त नवीन चॅटसाठी) */}
+        {ENABLE_SUGGESTIONS && !hasUserSpoken && suggestions.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide mb-1 max-w-3xl mx-auto">
+            {suggestions.map((sugg, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setManualText(sugg)}
+                className="whitespace-nowrap bg-white border border-[#4a9e4a]/40 text-[#2d6a2d] text-xs font-bold px-4 py-2 rounded-full shadow-sm hover:bg-[#d4edda] transition-colors"
+              >
+                {sugg}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 🟢 २. Image Preview (जर फोटो निवडला असेल तर) */}
         {imagePreview && (
-          <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-[#4a9e4a] mb-2 shadow-xl bg-white">
+          <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-[#4a9e4a] mb-2 shadow-xl bg-white max-w-3xl mx-auto">
             <img src={imagePreview} alt="Crop" className="object-cover w-full h-full" />
-            <button onClick={removeImage} className="absolute top-1 right-1 bg-red-500 rounded-full text-white p-1.5 shadow-md">
+            <button type="button" onClick={removeImage} className="absolute top-1 right-1 bg-red-500 rounded-full text-white p-1.5 shadow-md">
               <X size={14} />
             </button>
           </div>
         )}
 
-        <div className="flex items-end gap-2 bg-white/95 backdrop-blur-md rounded-[2rem] p-2 pr-2 shadow-[0_-5px_25px_rgba(0,0,0,0.05)] border border-[#d4a853]/40">
+        {/* 🟢 ३. Main Input Box */}
+        <div className="flex items-end gap-2 bg-white/95 backdrop-blur-md rounded-[2rem] p-2 pr-2 shadow-[0_-5px_25px_rgba(0,0,0,0.1)] border border-[#d4a853]/40 max-w-3xl mx-auto">
           <label className="p-3.5 bg-[#fdf8f0] text-[#8b5e3c] rounded-full cursor-pointer hover:bg-[#d4edda] transition-colors shrink-0">
             <Camera size={22} />
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
@@ -286,19 +381,32 @@ const VoiceRoom = () => {
           <textarea
             value={manualText}
             onChange={(e) => setManualText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (manualText.trim() || imageFile) handleSend();
+              }
+            }}
             placeholder={isListening ? "ऐकत आहे..." : "येथे लिहा किंवा बोला..."}
             className={`flex-1 bg-transparent border-none focus:outline-none resize-none text-[#2c1810] font-bold py-3.5 min-h-[50px] max-h-[120px] ${isListening ? 'animate-pulse text-[#4a9e4a]' : ''}`}
             rows="1"
           />
 
+          {/* मोबाईलसाठी टच-फ्रेंडली माईक */}
           <button 
-            onClick={toggleListening} 
+            type="button"
+            style={{ touchAction: 'manipulation' }}
+            onClick={(e) => {
+              e.preventDefault();
+              toggleListening();
+            }} 
             className={`p-3.5 rounded-full transition-all shrink-0 ${isListening ? 'bg-red-500 text-white shadow-inner animate-pulse' : 'bg-[#fdf8f0] text-[#4a9e4a] hover:bg-[#d4edda]'}`}
           >
             {isListening ? <Square size={22} fill="currentColor"/> : <Mic size={22} />}
           </button>
 
           <button 
+            type="button"
             onClick={handleSend} 
             disabled={radioState === 'thinking' || (!manualText.trim() && !imageFile)} 
             className="p-3.5 bg-gradient-to-r from-[#4a9e4a] to-[#2d6a2d] text-white rounded-full disabled:opacity-50 shrink-0 hover:scale-105 transition-transform shadow-md"
