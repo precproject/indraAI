@@ -11,6 +11,8 @@ const getSecurityPass = () => {
   return token ? `Bearer ${token}` : '';
 };
 
+let currentAudioPlayer = null; // ग्लोबल ऑडिओ रेफरन्स
+
 export const apiService = {
   // १. लॉगिन करताना पास लागत नाही
   async loginUser(phone, district) {
@@ -131,13 +133,18 @@ export const apiService = {
   },
 
   async playAudio(fallbackText, base64Audio) {
+    this.stopAudio();
+
     try {
       if (base64Audio) {
         const audio = new Audio(`data:audio/webm;base64,${base64Audio}`);
+        currentAudioPlayer = audio;
         await audio.play();
+        return;
       } else if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(fallbackText);
         const voices = speechSynthesis.getVoices();
+        currentAudioPlayer = utterance; // SpeechSynthesis ला ट्रॅक करणे थोडे वेगळे असते
 
         const voice =
           voices.find(v => v.lang === "mr-IN") ||
@@ -153,6 +160,18 @@ export const apiService = {
     } catch (error) {
       console.error("Audio playback failed:", error);
     }
+  },
+
+  // 🟢 नवीन: चालू असलेला ऑडिओ थांबवणे
+  stopAudio() {
+    if (currentAudioPlayer instanceof Audio) {
+      currentAudioPlayer.pause();
+      currentAudioPlayer.currentTime = 0;
+    }
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+    currentAudioPlayer = null;
   },
 
   // प्रोफाईल अपडेट करणे

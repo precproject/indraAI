@@ -1,26 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Square, CheckCircle2, Info, UserCheck, Sprout, Send, Camera, ThumbsUp, ThumbsDown, Globe, X, Volume2 } from 'lucide-react';
+import { Mic, Square, CheckCircle2, Info, UserCheck, Sprout, Send, Camera, ThumbsUp, ThumbsDown, Globe, X, Volume2, StopCircle } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAppContext } from '../context/AppContext';
 import { useNativeSpeech } from '../hooks/useNativeSpeech';
 
 const VoiceRoom = () => {
-  // 🟢 दुरुस्ती: addLocalLedgerEntry आणि addCredits इथे घेतले आहेत!
   const { user, cycles, ledger, addLedgerEntry, updateUserProfile, addLocalLedgerEntry, addCredits, chatHistory, setChatHistory } = useAppContext();
   
-  // 🟢 Feature Toggles (सेटिंग्ज)
-  const ENABLE_ICEBREAKER = false; // Icebreaker बंद करण्यासाठी false करा
-  const ENABLE_SUGGESTIONS = true; // स्मार्ट प्रश्न बंद करण्यासाठी false करा
+  const ENABLE_ICEBREAKER = false; 
+  const ENABLE_SUGGESTIONS = true; 
 
-  const hasIceBreakerFired = useRef(false); // 🟢 IceBreaker ला रोखण्यासाठी
-  const [suggestions, setSuggestions] = useState([]); // 🟢 स्मार्ट प्रश्नांसाठी
+  const hasIceBreakerFired = useRef(false); 
+  const [suggestions, setSuggestions] = useState([]); 
 
-  // ── 1. संवादाची सलग नोंद (Session Chat History) ──
-  //const [chatHistory, setChatHistory] = useState([]); 
   const chatEndRef = useRef(null); 
 
-  const [radioState, setRadioState] = useState('idle');
+  // 🟢 State: idle | thinking | speaking
+  const [radioState, setRadioState] = useState('idle');  
   const [manualText, setManualText] = useState('');
   const [selectedLang, setSelectedLang] = useState('mr-IN');
   const [imageFile, setImageFile] = useState(null);
@@ -32,22 +29,16 @@ const VoiceRoom = () => {
   const totalExpense = ledger.filter(e => e.type === 'expense').reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const profit = totalIncome - totalExpense;
 
-  // Smart Suggestions for New User
   const hasUserSpoken = chatHistory.some(msg => msg.sender === 'user');
 
-  // 🟢 नवीन: Ice Breaker (अ‍ॅप उघडताच आपोआप संवाद सुरू करणे)
   useEffect(() => {
-    // जर चॅट हिस्ट्री रिकामी असेल आणि युजर लोड झाला असेल
     if (user && chatHistory.length === 0 && !hasIceBreakerFired.current) {
-      hasIceBreakerFired.current = true; // एका सेकंदात लॉक करा म्हणजे दोनदा कॉल जाणार नाही!
+      hasIceBreakerFired.current = true; 
 
       const triggerIceBreaker = async () => {
         setRadioState('thinking');
         try {
-          // आपण AI ला एक छुपा संदेश पाठवत आहोत
           const hiddenMessage = "नमस्कार,";
-          
-          const activeCycle = cycles.length > 0 ? cycles[0] : null;
           const result = await apiService.processTextCommand(hiddenMessage, null, selectedLang);
 
           const aiMessage = {
@@ -61,10 +52,8 @@ const VoiceRoom = () => {
             feedback: null
           };
           
-          // इथे आपण युजरचा 'hiddenMessage' हिस्ट्रीमध्ये टाकत नाही आहोत, 
-          // फक्त AI चे उत्तर टाकत आहोत!
           setChatHistory([aiMessage]);
-          setRadioState('idle');
+          setRadioState('speaking');
 
           await apiService.playAudio(result.voice_text, result.audioContent);
         } catch (error) {
@@ -78,8 +67,6 @@ const VoiceRoom = () => {
       }
 
       if(ENABLE_SUGGESTIONS){
-        // 🟢 १. Ice Breaker आणि Smart Suggestions जनरेट करणे
-        // --- स्मार्ट प्रश्न तयार करणे ---
         const month = new Date().getMonth() + 1;
         const season = month >= 6 && month <= 10 ? "खरीप" : (month >= 11 || month <= 3 ? "रब्बी" : "उन्हाळी");
         const dist = user.district || 'तुमच्या';
@@ -91,11 +78,10 @@ const VoiceRoom = () => {
           `माती परीक्षणासाठी मातीचा नमुना कसा घ्यावा?`,
           `माझ्या शेताचा हिशोब कसा ठेवायचा?`
         ];
-        // कोणतेही ३ रँडम प्रश्न निवडा
         setSuggestions(allPrompts.sort(() => 0.5 - Math.random()).slice(0, 3));
       }
     }
-  }, [user, cycles]); // जेव्हा user डेटा उपलब्ध होईल तेव्हाच हे चालेल
+  }, [user, cycles]); 
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -106,6 +92,14 @@ const VoiceRoom = () => {
       setManualText(transcript);
     }
   }, [transcript, isListening]);
+
+  // 🟢 नवीन: माईक चालू करताना जुना ऑडिओ थांबवा
+  const handleMicToggle = (e) => {
+    if (e) e.preventDefault();
+    apiService.stopAudio(); 
+    setRadioState('idle'); 
+    toggleListening();
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -123,15 +117,12 @@ const VoiceRoom = () => {
   const handleFeedback = async (messageIndex, type) => {
     const updatedHistory = [...chatHistory];
     const targetMessage = updatedHistory[messageIndex];
-    // updatedHistory[messageIndex].feedback = type;
     targetMessage.feedback = type;
     setChatHistory(updatedHistory);
     
-    // 🟢 खरा chatId बॅकएंडला पाठवा
     if (targetMessage.chatId) {
       try {
         await apiService.sendFeedback(targetMessage.chatId, type);
-        console.log(`Feedback saved: ${targetMessage.chatId}`);
       } catch (e) {
         console.warn("Feedback save failed");
       }
@@ -139,11 +130,20 @@ const VoiceRoom = () => {
   };
 
   const replayAudio = async (audioContent, fallbackText) => {
+    setRadioState('speaking');
     await apiService.playAudio(fallbackText, audioContent);
   };
 
+  const stopAudio = () => {
+    apiService.stopAudio();
+    setRadioState('idle');
+  }
+
   const handleSend = async () => {
     if (!manualText.trim() && !imageFile) return;
+
+    // 🟢 मेसेज सेंड करताना जुना ऑडिओ थांबवा
+    apiService.stopAudio();
 
     if (isListening) toggleListening(); 
 
@@ -172,52 +172,49 @@ const VoiceRoom = () => {
         tip: result.tip,
         audioContent: result.audioContent,
         voice_text: result.voice_text,
-        chatId: result.chatId, // 🟢 बॅकएंडकडून आलेला ID सेव्ह करा
+        chatId: result.chatId, 
         feedback: null
       };
       
       setChatHistory(prev => [...prev, aiMessage]);
-      setRadioState('idle');
+      setRadioState('speaking'); 
 
-      // 🟢 अ‍ॅक्शन्सची तपासणी 
       if (result.action?.type === 'ADD_LEDGER' && result.action.payload) {
         await addLedgerEntry(result.action.payload);
       } else if (result.action?.type === 'ADD_LEDGER_LOCAL' && result.action.payload) {
-        addLocalLedgerEntry(result.action.payload); // दुहेरी नोंद टाळण्यासाठी
-        console.log("Ledger saved natively by backend.");
+        addLocalLedgerEntry(result.action.payload); 
       }
 
       if (result.action?.type === 'UPDATE_PROFILE' && result.action.payload) {
         updateUserProfile(result.action.payload);
       }
 
-      // 🟢 स्मार्ट क्रेडिट्स जोडणे
       if (result.creditsAwarded > 0) {
         addCredits(result.creditsAwarded);
       }
 
       await apiService.playAudio(result.voice_text, result.audioContent);
+      
+      // टीप: खऱ्या ॲपमध्ये TTS संपल्यावर 'idle' करण्यासाठी Event Listener लागतो.
+      // तात्पुरते आपण युजरला 'Stop' बटन दिले आहे.
 
     } catch (error) {
       console.error("Processing error:", error);
 
-      // 🟢 २. एरर मेसेज तयार करणे (भाषेनुसार)
       const errorMsg = selectedLang === 'hi-IN' 
         ? 'माफ़ करना, मुझे ठीक से समझ नहीं आया। कृपया दोबारा कोशिश करें।' 
         : 'माफी असावी, मला नीट समजले नाही. कृपया पुन्हा प्रयत्न करा.';
 
       setChatHistory(prev => [...prev, { sender: 'ai', text: errorMsg }]);
-
       setRadioState('idle');
 
-      // 🟢 ३. शेतकऱ्याने दिलेला डेटा परत पाटीवर (Input Box) आणणे
       setManualText(currentText);
       if (currentImageFile) {
         setImageFile(currentImageFile);
         setImagePreview(currentImagePreview);
       }
 
-      // 🟢 ४. एरर मेसेज 'बोलून' दाखवणे (Fallback TTS चा वापर करून)
+      setRadioState('speaking');
       await apiService.playAudio(errorMsg, null);
     }
   };
@@ -296,9 +293,16 @@ const VoiceRoom = () => {
                     {msg.tip && <p className="text-xs font-bold text-[#8b5e3c] bg-[#fdf8f0] p-3 rounded-xl flex items-start gap-2 border border-[#d4a853]/20"><Info size={16} className="shrink-0 mt-0.5"/> {msg.tip}</p>}
                     
                     <div className="flex items-center justify-between pt-3 border-t border-[#fdf8f0] mt-3">
-                      <button onClick={() => replayAudio(msg.audioContent, msg.voice_text)} className="text-[#4a9e4a] flex items-center gap-1.5 text-[11px] font-bold bg-green-50 px-3 py-1.5 rounded-full hover:bg-green-100 transition-colors border border-green-200">
-                        <Volume2 size={14} /> पुन्हा ऐका
-                      </button>
+                      {/* 🟢 Play/Stop Buttons Fix */}
+                      <div className="flex gap-2">
+                        <button onClick={() => replayAudio(msg.audioContent, msg.voice_text)} className="text-[#4a9e4a] flex items-center gap-1 text-[11px] font-bold bg-green-50 px-2 py-1.5 rounded-full hover:bg-green-100 transition-colors border border-green-200">
+                          <Volume2 size={14} /> ऐका
+                        </button>
+                        <button onClick={stopAudio} className="text-red-500 flex items-center gap-1 text-[11px] font-bold bg-red-50 px-2 py-1.5 rounded-full hover:bg-red-100 transition-colors border border-red-200">
+                          <StopCircle size={14} /> थांबवा
+                        </button>
+                      </div>
+
                       <div className="flex gap-2">
                         <button onClick={() => handleFeedback(idx, 'up')} className={`p-1.5 rounded-full transition-colors border ${msg.feedback === 'up' ? 'bg-[#d4edda] text-green-700 border-green-300' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'}`}><ThumbsUp size={14}/></button>
                         <button onClick={() => handleFeedback(idx, 'down')} className={`p-1.5 rounded-full transition-colors border ${msg.feedback === 'down' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'}`}><ThumbsDown size={14}/></button>
@@ -311,6 +315,7 @@ const VoiceRoom = () => {
           ))}
         </AnimatePresence>
         
+        {/* 🟢 विचार करत असताना येणारे अ‍ॅनिमेशन */}
         {radioState === 'thinking' && (
           <div className="flex justify-start mb-4">
             <div className="bg-white border border-[#d4a853]/30 rounded-[1.5rem] rounded-tl-sm p-4 flex items-center gap-3 shadow-sm">
@@ -320,32 +325,31 @@ const VoiceRoom = () => {
           </div>
         )}
 
-        <div className={`flex flex-col items-center justify-center opacity-90 transition-all duration-500 ${chatHistory.length === 0 ? 'mt-20' : 'mt-8 mb-4'}`}>
-          <button 
-            type="button"
-            style={{ touchAction: 'manipulation' }} // 🟢 मोबाईलवर टच लगेच नोंदवण्यासाठी
-            onClick={(e) => {
-              e.preventDefault(); // डबल टॅप/झूम रोखण्यासाठी
-              toggleListening();
-            }}
-            className={`w-28 h-28 rounded-full flex items-center justify-center shadow-xl transition-all duration-300 ${
-              isListening ? 'bg-red-500 scale-110 animate-pulse shadow-[0_0_40px_rgba(239,68,68,0.5)]' : 'bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] hover:scale-105 shadow-[0_10px_25px_rgba(45,106,45,0.4)]'
-            }`}
-          >
-            {isListening ? <Square size={36} className="text-white" fill="currentColor" /> : <Mic size={48} className="text-white drop-shadow-md" />}
-          </button>
-          <p className="mt-4 text-[#8b5e3c] font-bold text-center text-sm">
-            {isListening ? "ऐकत आहे..." : chatHistory.length === 0 ? "खालील बटण दाबा आणि बोला" : "पुन्हा बोलण्यासाठी दाबा"}
-          </p>
-        </div>
+        {/* 🟢 BIG MIC FIX: जर AI विचार करत असेल (thinking) तर हे मोठे बटण लपवा */}
+        {radioState !== 'thinking' && (
+          <div className={`flex flex-col items-center justify-center opacity-90 transition-all duration-500 ${chatHistory.length === 0 ? 'mt-20' : 'mt-8 mb-4'}`}>
+            <button 
+              type="button"
+              style={{ touchAction: 'manipulation' }}
+              onClick={handleMicToggle} 
+              className={`w-28 h-28 rounded-full flex items-center justify-center shadow-xl transition-all duration-300 ${
+                isListening ? 'bg-red-500 scale-110 animate-pulse shadow-[0_0_40px_rgba(239,68,68,0.5)]' : 'bg-gradient-to-br from-[#4a9e4a] to-[#2d6a2d] hover:scale-105 shadow-[0_10px_25px_rgba(45,106,45,0.4)]'
+              }`}
+            >
+              {isListening ? <Square size={36} className="text-white" fill="currentColor" /> : <Mic size={48} className="text-white drop-shadow-md" />}
+            </button>
+            <p className="mt-4 text-[#8b5e3c] font-bold text-center text-sm">
+              {isListening ? "ऐकत आहे..." : chatHistory.length === 0 ? "खालील बटण दाबा आणि बोला" : "पुन्हा बोलण्यासाठी दाबा"}
+            </p>
+          </div>
+        )}
 
         <div ref={chatEndRef} />
       </div>
 
-      {/* ── Unified Input Area (Mobile Keyboard Fix) ── ── */}
+      {/* ── Unified Input Area ── */}
       <div className="sticky bottom-0 z-50 w-full px-4 pb-4 pt-8 bg-gradient-to-t from-[#fdf8f0] via-[#fdf8f0] to-[#fdf8f0]/0 shrink-0">
         
-        {/* 🟢 १. Smart Suggestions (फक्त नवीन चॅटसाठी) */}
         {ENABLE_SUGGESTIONS && !hasUserSpoken && suggestions.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide mb-1 max-w-3xl mx-auto">
             {suggestions.map((sugg, idx) => (
@@ -361,7 +365,6 @@ const VoiceRoom = () => {
           </div>
         )}
 
-        {/* 🟢 २. Image Preview (जर फोटो निवडला असेल तर) */}
         {imagePreview && (
           <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-[#4a9e4a] mb-2 shadow-xl bg-white max-w-3xl mx-auto">
             <img src={imagePreview} alt="Crop" className="object-cover w-full h-full" />
@@ -371,7 +374,6 @@ const VoiceRoom = () => {
           </div>
         )}
 
-        {/* 🟢 ३. Main Input Box */}
         <div className="flex items-end gap-2 bg-white/95 backdrop-blur-md rounded-[2rem] p-2 pr-2 shadow-[0_-5px_25px_rgba(0,0,0,0.1)] border border-[#d4a853]/40 max-w-3xl mx-auto">
           <label className="p-3.5 bg-[#fdf8f0] text-[#8b5e3c] rounded-full cursor-pointer hover:bg-[#d4edda] transition-colors shrink-0">
             <Camera size={22} />
@@ -392,15 +394,12 @@ const VoiceRoom = () => {
             rows="1"
           />
 
-          {/* मोबाईलसाठी टच-फ्रेंडली माईक */}
           <button 
             type="button"
             style={{ touchAction: 'manipulation' }}
-            onClick={(e) => {
-              e.preventDefault();
-              toggleListening();
-            }} 
-            className={`p-3.5 rounded-full transition-all shrink-0 ${isListening ? 'bg-red-500 text-white shadow-inner animate-pulse' : 'bg-[#fdf8f0] text-[#4a9e4a] hover:bg-[#d4edda]'}`}
+            onClick={handleMicToggle} 
+            disabled={radioState === 'thinking'} // Disable bottom mic when thinking
+            className={`p-3.5 rounded-full transition-all shrink-0 ${isListening ? 'bg-red-500 text-white shadow-inner animate-pulse' : 'bg-[#fdf8f0] text-[#4a9e4a] hover:bg-[#d4edda] disabled:opacity-50'}`}
           >
             {isListening ? <Square size={22} fill="currentColor"/> : <Mic size={22} />}
           </button>
