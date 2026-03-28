@@ -193,4 +193,22 @@ export const apiService = {
     if (!response.ok) return { ledger: [], chats: [] };
     return await response.json();
   },
+
+  // 🟢 नवीन: पिकाची सविस्तर माहिती आणणे
+  async getCycleDetails(cycleId) {
+    const response = await fetch(`${API_BASE}/cycles/${cycleId}`, {
+      headers: { 'Authorization': getSecurityPass() }
+    });
+    if (!response.ok) throw new Error('Failed to fetch cycle details');
+    return await response.json();
+  },
+
+  // 🟢 सर्व पिके आणणे (List)
+  async getFarmerCycles() {
+    const response = await fetch(`${API_BASE}/cycles`, {
+      headers: { 'Authorization': getSecurityPass() }
+    });
+    if (!response.ok) throw new Error('Failed to fetch cycles');
+    return await response.json();
+  }
 };
