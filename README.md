@@ -1,4 +1,4 @@
-🌾 IndraAI (इंद्र AI)
+🌾 IndraAI (इंद्र AI) V2
 The Voice-First Agri-Intelligence Platform for Maharashtra
 
 IndraAI is a comprehensive, dual-sided platform designed to solve two massive problems in the Indian agricultural sector:
