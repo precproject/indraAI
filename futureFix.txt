@@ -1,0 +1,207 @@
+🛠️ 2. Mobile Auto-play (TTS) Blocked (ऑडिओ आपोआप न वाजणे)
+प्रॉब्लेम: Apple (iOS Safari) आणि Android Chrome चा अत्यंत कडक नियम आहे: "कोणताही ऑडिओ युजरच्या थेट क्लिकशिवाय (User Gesture) प्ले होऊ शकत नाही." आपला AI कॉल ३-४ सेकंद घेतो, त्यामुळे ब्राउझर तो क्लिकचा संदर्भ विसरतो आणि ऑडिओ ब्लॉक करतो.
+द मास्टर फिक्स (The Silent Audio Trick):
+जेव्हा युजर पहिल्यांदा 'Send' किंवा 'Mic' बटण दाबेल, तेव्हा आपण एक ०.१ सेकंदाचा रिकाम्या आवाजाचा (Silent) ट्रॅक प्ले करून ऑडिओ इंजिन 'Unlock' करू.
+तुमच्या apiService.js मध्ये हे जोडा:
+
+JavaScript
+let isAudioUnlocked = false;
+const silentAudio = new Audio("data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq");
+
+export const apiService = {
+  unlockMobileAudio() {
+    if (!isAudioUnlocked) {
+      silentAudio.play().then(() => { isAudioUnlocked = true; }).catch(e => console.warn(e));
+    }
+  },
+  // ... बाकीचे कोड
+आणि VoiceRoom.jsx मध्ये handleSend आणि handleMicToggle च्या सुरुवातीला apiService.unlockMobileAudio(); कॉल करा. यामुळे मोबाईलवरही ऑडिओ आपोआप वाजेल!
+
+
+
+
+
+
+
+3) Voice Native Speech
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+export const useNativeSpeech = (options = { lang: 'mr-IN', continuous: true, autoRestart: true }) => {
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [permissionState, setPermissionState] = useState('unknown'); 
+  const [error, setError] = useState(null);
+  
+  const recognitionRef = useRef(null);
+  const isManuallyStopped = useRef(false);
+  const finalTranscriptRef = useRef('');
+
+  // 🔐 Check mic permission status
+  const checkPermission = useCallback(async () => {
+    try {
+      if (!navigator.permissions) return 'unknown';
+
+      const result = await navigator.permissions.query({ name: 'microphone' });
+      setPermissionState(result.state);
+
+      result.onchange = () => {
+        setPermissionState(result.state);
+      };
+
+      return result.state;
+    } catch {
+      return 'unknown';
+    }
+  }, []);
+
+  useEffect(() => {
+    checkPermission();
+  }, [checkPermission]);
+
+  // ⚙️ Setup Speech Recognition (Only re-run if options change, NOT on permission change)
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError('आपल्या ब्राउझरमध्ये आवाज ओळखण्याची सोय उपलब्ध नाही'); 
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = options.lang || 'mr-IN';
+    recognition.continuous = options.continuous !== undefined ? options.continuous : true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setError(null);
+      isManuallyStopped.current = false;
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+
+      // 🔹 FIX: Start from event.resultIndex, not 0, to prevent text duplication
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const text = event.results[i][0].transcript;
+
+        if (event.results[i].isFinal) {
+          finalTranscriptRef.current += text + ' ';
+        } else {
+          interimTranscript += text;
+        }
+      }
+
+      setTranscript((finalTranscriptRef.current + ' ' + interimTranscript).trim());
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech Recognition Error:", event.error);
+
+      // Ignore "no-speech" so auto-restart can do its job silently
+      if (event.error === 'no-speech') return; 
+
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setError('कृपया मायक्रोफोन प्रवेश द्या'); 
+        setPermissionState('denied');
+      } else if (event.error === 'network') {
+        setError('नेटवर्कमध्ये त्रुटी आहे');
+      } else {
+        setError('काहीतरी चूक झाली: ' + event.error);
+      }
+
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+
+      // 🔁 Auto restart with a slight delay to prevent browser crash
+      if (
+        options.continuous &&
+        options.autoRestart &&
+        !isManuallyStopped.current &&
+        permissionState !== 'denied'
+      ) {
+        setTimeout(() => {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.warn('Restart failed:', e.message);
+          }
+        }, 300);
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      try {
+        isManuallyStopped.current = true;
+        recognition.stop();
+      } catch {}
+    };
+  // 🔹 FIX: Removed permissionState from array so it doesn't destroy the instance when permission is granted
+  }, [options.lang, options.continuous, options.autoRestart]); 
+
+  // ▶️ Start
+  const startListening = async () => {
+    isManuallyStopped.current = false;
+
+    // 🔹 FIX: Request mic, but IMMEDIATELY release the track so Speech API can use it
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop()); // <-- This was missing!
+        setPermissionState('granted');
+      }
+    } catch {
+      setError('कृपया मायक्रोफोन प्रवेश द्या'); 
+      setPermissionState('denied');
+      return;
+    }
+
+    if (!recognitionRef.current) return;
+
+    try {
+      resetTranscript();
+      setError(null);
+      recognitionRef.current.start();
+    } catch (e) {
+      console.warn('Start error:', e.message);
+    }
+  };
+
+  // ⏹ Stop
+  const stopListening = () => {
+    isManuallyStopped.current = true;
+    try {
+      recognitionRef.current?.stop();
+    } catch {}
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const resetTranscript = () => {
+    finalTranscriptRef.current = '';
+    setTranscript('');
+  };
+
+  return {
+    isListening,
+    transcript,
+    error,
+    permissionState,
+    startListening,
+    stopListening,
+    toggleListening,
+    resetTranscript,
+    isSupported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+  };
+};
