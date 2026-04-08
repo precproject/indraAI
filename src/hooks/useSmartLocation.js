@@ -13,8 +13,25 @@ export const useSmartLocation = () => {
 
   const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState(null);
+  const [permissionState, setPermissionState] = useState('prompt'); // granted | denied | prompt
 
-  const fetchLocation = useCallback(() => {
+  // ✅ Check permission state (important for UX)
+  const checkPermission = async () => {
+    try {
+      if (!navigator.permissions) return;
+
+      const result = await navigator.permissions.query({ name: 'geolocation' });
+      setPermissionState(result.state);
+
+      if (result.state === 'denied') {
+        setError('लोकेशन परवानगी बंद आहे. कृपया ब्राउजर सेटिंगमध्ये जाऊन चालू करा.');
+      }
+    } catch (err) {
+      console.warn('Permission API not supported');
+    }
+  };
+
+  const fetchLocation = useCallback(async () => {
     setIsLocating(true);
     setError(null);
 
@@ -24,6 +41,9 @@ export const useSmartLocation = () => {
       return;
     }
 
+    // 🔍 Check permission first
+    await checkPermission();
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = position.coords.latitude;
@@ -32,7 +52,7 @@ export const useSmartLocation = () => {
         try {
           // Nominatim कडून मराठी/इंग्रजी पत्ता आणणे
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&accept-language=mr,en&format=json`,
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&accept-language=mr&format=json`,
             { headers: { 'User-Agent': 'IndraAI-AgriApp/1.0' } }
           );
 
@@ -59,13 +79,28 @@ export const useSmartLocation = () => {
         }
       },
       (err) => {
+        let message = '';
+        switch (err.code) {
+          case 1:
+            message = 'तुम्ही लोकेशन परवानगी नाकारली आहे. कृपया माहिती हाताने भरा.';
+            break;
+          case 2:
+            message = 'लोकेशन उपलब्ध नाही. कृपया GPS चालू करा.';
+            break;
+          case 3:
+            message = 'लोकेशन घेण्यास जास्त वेळ लागला.';
+            break;
+          default:
+            message = 'लोकेशन मिळवता आले नाही. कृपया GPS चालू करा आणि परवानगी द्या.';
+        }
+
+        setError(message);
         // जर युजरने परवानगी नाकारली (Permission Denied)
-        setError('लोकेशन मिळवता आले नाही. कृपया GPS चालू करा आणि परवानगी द्या.');
         setIsLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   }, []);
 
-  return { locationData, isLocating, error, fetchLocation };
+  return { locationData, isLocating, error, permissionState, fetchLocation };
 };

@@ -19,36 +19,67 @@ const Onboarding = () => {
   const [district, setDistrict] = useState(user?.district || '');
   const [village, setVillage] = useState('');
   const [pincode, setPincode] = useState('');
-  const [stateName, setStateName] = useState('Maharashtra');
+  const [stateName, setStateName] = useState('महाराष्ट्र');
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleTranslateOnBlur = async (value, setter) => {
-    const isEnglish = (text) => /^[A-Za-z\s]+$/.test(text);
+  const isLocationFound = locationData?.lat && locationData?.lng;
 
+  // ✅ Detect English anywhere in string
+  const containsEnglish = (text) => /[A-Za-z]/.test(text);
+
+  const handleTranslateOnBlur = async (value, setter, field) => {
     if (!value) return;
-    // Only translate if it's English
-    if (!isEnglish(value)) return;
-    const translated = await translateToMarathi(value);
-    setter(translated);
+
+    // ❌ Skip pincode
+    if (field === "pincode") return;
+
+    // ❌ Skip if no English
+    if (!containsEnglish(value)) return;
+
+    try {
+      const translated = await translateToMarathi(value);
+
+      if (translated && translated !== value) {
+        setter(translated);
+      }
+    } catch (err) {
+      console.error("Translation failed:", err);
+    }
   };
 
   // 🟢 १. पेज लोड होताच आपोआप लोकेशनची परवानगी मागणे
   useEffect(() => {
     fetchLocation();
-  }, [fetchLocation]);
+  }, []);
 
-  // लोकेशन मिळाल्यावर रकाने आपोआप भरणे
+  // 🟢 Auto-fill + translate location data
   useEffect(() => {
-    if (locationData.lat) {
-      setVillage(locationData.village || '');
-      setDistrict(locationData.district || '');
-      setPincode(locationData.pincode || '');
-      setStateName(locationData.state || 'Maharashtra');
-    }
+    const translateLocationFields = async () => {
+      if (locationData?.lat) {
+        const v = locationData.village || '';
+        const d = locationData.district || '';
+        const s = locationData.state || 'महाराष्ट्र';
 
-    if(user?.isProfileComplete == true && user?.name!=""){
-        navigate('/app'); 
-    }
+        setPincode(locationData.pincode || '');
+
+        try {
+          setVillage(containsEnglish(v) ? await translateToMarathi(v) : v);
+          setDistrict(containsEnglish(d) ? await translateToMarathi(d) : d);
+          setStateName(containsEnglish(s) ? await translateToMarathi(s) : s);
+        } catch (err) {
+          console.error("Auto translation failed:", err);
+          setVillage(v);
+          setDistrict(d);
+          setStateName(s);
+        }
+      }
+
+      if (user?.isProfileComplete && user?.name !== "") {
+        navigate('/app');
+      }
+    };
+
+    translateLocationFields();
   }, [locationData]);
 
   const handleCompleteProfile = async (e) => {
@@ -61,11 +92,11 @@ const Onboarding = () => {
     setIsSaving(true);
 
     const fullProfileData = {
-      name: name,
-      district: district,
-      village: village,
+      name,
+      district,
+      village,
       state: stateName,
-      pincode: pincode,
+      pincode,
       latitude: locationData.lat,
       longitude: locationData.lng,
       isProfileComplete: true
@@ -79,12 +110,11 @@ const Onboarding = () => {
       if (user?.id) {
         await apiService.updateProfile(user.id, fullProfileData);
       }
-      
-      setIsSaving(false);
       navigate('/app'); 
       
     } catch (error) {
       console.error("Profile saving failed:", error);
+    } finally {
       setIsSaving(false);
     }
   };
@@ -159,8 +189,8 @@ const Onboarding = () => {
               disabled={isLocating}
               className="w-full bg-[#d4edda] text-[#2d6a2d] font-bold py-3 rounded-2xl border border-[#bbf7d0] flex items-center justify-center gap-2 hover:bg-[#bbf7d0] transition-colors"
             >
-              {isLocating ? <Loader2 size={18} className="animate-spin" /> : <Navigation size={18} />}
-              {isLocating ? 'लोकेशन शोधत आहे...' : '📍 माझे अचूक लोकेशन घ्या'}
+              {isLocating && !locationError ? <Loader2 size={18} className="animate-spin" /> : <Navigation size={18} />}
+              {isLocating && !locationError ? 'लोकेशन शोधत आहे...' : !isLocationFound  ? '📍 माझे अचूक लोकेशन घ्या' : '✅ लोकेशन मिळाले!'}
             </button>
 
             {locationError && <p className="text-xs text-red-500 font-bold text-center">{locationError}</p>}
