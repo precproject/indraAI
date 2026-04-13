@@ -174,6 +174,9 @@ const VoiceRoom = () => {
         voice_text: result.voice_text,
         chatId: result.chatId, 
         feedback: null
+        feedback: null,
+        is_complete: result.is_complete, // 🟢 Needed for UI Form
+        extracted_data: result.extracted_data // 🟢 Needed for UI Form
       };
       
       setChatHistory(prev => [...prev, aiMessage]);
@@ -217,6 +220,67 @@ const VoiceRoom = () => {
       setRadioState('speaking');
       await apiService.playAudio(errorMsg, null);
     }
+  };
+
+  // 🟢 DYNAMIC SMART FORM COMPONENT
+  const renderMissingDataForm = (extractedData) => {
+    if (!extractedData) return null;
+
+    // Define all possible fields and their types
+    const ALL_FIELDS = [
+      { key: 'crop', label: 'पीक', type: 'text', placeholder: 'उदा. गहू' },
+      { key: 'variety', label: 'वाण/ब्रँड', type: 'text', placeholder: 'उदा. श्रीराम' },
+      { key: 'area', label: 'क्षेत्र (एकर)', type: 'number', placeholder: 'उदा. २' },
+      { key: 'category', label: 'प्रकार', type: 'select', options: ['बियाणे', 'खते', 'कीटकनाशक', 'मजुरी', 'यंत्र', 'सिंचन', 'विक्री', 'इतर'] },
+      { key: 'amount', label: 'रक्कम (₹)', type: 'number', placeholder: 'उदा. २०००' },
+      { key: 'quantity_in_quintal', label: 'क्विंटल', type: 'number', placeholder: 'उदा. १०' },
+      { key: 'market', label: 'बाजार', type: 'text', placeholder: 'उदा. लासलगाव' },
+      { key: 'event_date', label: 'तारीख', type: 'date' },
+      { key: 'agri_inputs', label: 'खत/औषध नाव', type: 'text', placeholder: 'उदा. 10:26:26' },
+    ];
+
+    // Filter fields that are strictly NULL (meaning they are missing)
+    const missingFields = ALL_FIELDS.filter(f => extractedData[f.key] === null);
+
+    if (missingFields.length === 0) return null;
+
+    const handleSubmitForm = (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const updates = [];
+      
+      missingFields.forEach(field => {
+         const val = formData.get(field.key);
+         if(val) updates.push(`${field.label}: ${val}`);
+      });
+      
+      if(updates.length > 0) {
+         handleSend(`माहिती: ${updates.join(', ')}`); // Send merged text to AI
+      }
+    };
+    return (
+      <form onSubmit={handleSubmitForm} className="mt-4 bg-[#fdf8f0] p-4 rounded-xl border border-[#d4a853]/40">
+        <p className="text-xs font-bold text-[#8b5e3c] mb-3 border-b border-[#d4a853]/20 pb-2">✏️ कृपया अपूर्ण माहिती भरा:</p>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          {missingFields.map(field => (
+            <div key={field.key}>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">{field.label}</label>
+              {field.type === 'select' ? (
+                <select name={field.key} className="w-full text-sm p-2 rounded border border-gray-200 outline-none focus:border-[#4a9e4a] bg-white">
+                  <option value="">निवडा...</option>
+                  {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              ) : (
+                <input name={field.key} type={field.type} step={field.type === 'number' ? '0.1' : undefined} placeholder={field.placeholder || ''} className="w-full text-sm p-2 rounded border border-gray-200 outline-none focus:border-[#4a9e4a]" />
+              )}
+            </div>
+          ))}
+        </div>
+        <button type="submit" className="w-full bg-[#4a9e4a] text-white py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-[#368636]">
+          माहिती जतन करा
+        </button>
+      </form>
+    );
   };
 
   return (
@@ -282,33 +346,42 @@ const VoiceRoom = () => {
                 
                 {msg.image && <img src={msg.image} alt="Crop" className="w-full h-32 object-cover rounded-xl mb-3 border border-white/50" />}
                 
-                <p className="text-[15px] font-semibold whitespace-pre-wrap">{msg.text}</p>
-                
+                <p className="text-[15px] font-semibold whitespace-pre-wrap">
+                  {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
+                </p>
+                                
                 {msg.sender === 'ai' && (
-                  <div className="mt-4 space-y-2">
-                    {msg.action?.type.includes('ADD_LEDGER') && <p className="text-xs font-bold text-[#166534] bg-[#f0fdf4] p-2 rounded-lg flex items-center gap-1.5 border border-[#bbf7d0]"><CheckCircle2 size={14}/> हिशोब जतन केला</p>}
-                    {msg.action?.type.includes('ADD_ACTIVITY') && <p className="text-xs font-bold text-[#1e3a8a] bg-[#eff6ff] p-2 rounded-lg flex items-center gap-1.5 border border-[#bfdbfe]"><Sprout size={14}/> नोंद जतन केली</p>}
-                    {msg.action?.type === 'UPDATE_PROFILE' && <p className="text-xs font-bold text-[#8b5e3c] bg-[#fef08a]/30 p-2 rounded-lg flex items-center gap-1.5 border border-[#d4a853]/50"><UserCheck size={14}/> प्रोफाइल अपडेट केले</p>}
+                  <>
+                    {/* 🟢 RENDER DYNAMIC FORM if data is missing and it's the last message */}
+                    {msg.is_complete === false && msg.extracted_data && idx === chatHistory.length - 1 && (
+                       renderMissingDataForm(msg.extracted_data)
+                    )}
                     
-                    {msg.tip && <p className="text-xs font-bold text-[#8b5e3c] bg-[#fdf8f0] p-3 rounded-xl flex items-start gap-2 border border-[#d4a853]/20"><Info size={16} className="shrink-0 mt-0.5"/> {msg.tip}</p>}
-                    
-                    <div className="flex items-center justify-between pt-3 border-t border-[#fdf8f0] mt-3">
-                      {/* 🟢 Play/Stop Buttons Fix */}
-                      <div className="flex gap-2">
-                        <button onClick={() => replayAudio(msg.audioContent, msg.voice_text)} className="text-[#4a9e4a] flex items-center gap-1 text-[11px] font-bold bg-green-50 px-2 py-1.5 rounded-full hover:bg-green-100 transition-colors border border-green-200">
-                          <Volume2 size={14} /> ऐका
-                        </button>
-                        <button onClick={stopAudio} className="text-red-500 flex items-center gap-1 text-[11px] font-bold bg-red-50 px-2 py-1.5 rounded-full hover:bg-red-100 transition-colors border border-red-200">
-                          <StopCircle size={14} /> थांबवा
-                        </button>
-                      </div>
+                    <div className="mt-4 space-y-2">
+                      {msg.action?.type.includes('ADD_LEDGER') && <p className="text-xs font-bold text-[#166534] bg-[#f0fdf4] p-2 rounded-lg flex items-center gap-1.5 border border-[#bbf7d0]"><CheckCircle2 size={14}/> हिशोब जतन केला</p>}
+                      {msg.action?.type.includes('ADD_ACTIVITY') && <p className="text-xs font-bold text-[#1e3a8a] bg-[#eff6ff] p-2 rounded-lg flex items-center gap-1.5 border border-[#bfdbfe]"><Sprout size={14}/> नोंद जतन केली</p>}
+                      {msg.action?.type === 'UPDATE_PROFILE' && <p className="text-xs font-bold text-[#8b5e3c] bg-[#fef08a]/30 p-2 rounded-lg flex items-center gap-1.5 border border-[#d4a853]/50"><UserCheck size={14}/> प्रोफाइल अपडेट केले</p>}
+                      
+                      {msg.tip && <p className="text-xs font-bold text-[#8b5e3c] bg-[#fdf8f0] p-3 rounded-xl flex items-start gap-2 border border-[#d4a853]/20"><Info size={16} className="shrink-0 mt-0.5"/> {msg.tip}</p>}
+                      
+                      <div className="flex items-center justify-between pt-3 border-t border-[#fdf8f0] mt-3">
+                        {/* 🟢 Play/Stop Buttons Fix */}
+                        <div className="flex gap-2">
+                          <button onClick={() => replayAudio(msg.audioContent, msg.voice_text)} className="text-[#4a9e4a] flex items-center gap-1 text-[11px] font-bold bg-green-50 px-2 py-1.5 rounded-full hover:bg-green-100 transition-colors border border-green-200">
+                            <Volume2 size={14} /> ऐका
+                          </button>
+                          <button onClick={stopAudio} className="text-red-500 flex items-center gap-1 text-[11px] font-bold bg-red-50 px-2 py-1.5 rounded-full hover:bg-red-100 transition-colors border border-red-200">
+                            <StopCircle size={14} /> थांबवा
+                          </button>
+                        </div>
 
-                      <div className="flex gap-2">
-                        <button onClick={() => handleFeedback(idx, 'up')} className={`p-1.5 rounded-full transition-colors border ${msg.feedback === 'up' ? 'bg-[#d4edda] text-green-700 border-green-300' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'}`}><ThumbsUp size={14}/></button>
-                        <button onClick={() => handleFeedback(idx, 'down')} className={`p-1.5 rounded-full transition-colors border ${msg.feedback === 'down' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'}`}><ThumbsDown size={14}/></button>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleFeedback(idx, 'up')} className={`p-1.5 rounded-full transition-colors border ${msg.feedback === 'up' ? 'bg-[#d4edda] text-green-700 border-green-300' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'}`}><ThumbsUp size={14}/></button>
+                          <button onClick={() => handleFeedback(idx, 'down')} className={`p-1.5 rounded-full transition-colors border ${msg.feedback === 'down' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'}`}><ThumbsDown size={14}/></button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </motion.div>
