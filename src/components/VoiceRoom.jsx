@@ -173,7 +173,6 @@ const VoiceRoom = () => {
         audioContent: result.audioContent,
         voice_text: result.voice_text,
         chatId: result.chatId, 
-        feedback: null
         feedback: null,
         is_complete: result.is_complete, // 🟢 Needed for UI Form
         extracted_data: result.extracted_data // 🟢 Needed for UI Form

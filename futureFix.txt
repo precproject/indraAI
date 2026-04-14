@@ -1,3 +1,9 @@
+
+1) If nativeSpeech not supported then use audio recording + along can support image upload
+
+
+
+
 🛠️ 2. Mobile Auto-play (TTS) Blocked (ऑडिओ आपोआप न वाजणे)
 प्रॉब्लेम: Apple (iOS Safari) आणि Android Chrome चा अत्यंत कडक नियम आहे: "कोणताही ऑडिओ युजरच्या थेट क्लिकशिवाय (User Gesture) प्ले होऊ शकत नाही." आपला AI कॉल ३-४ सेकंद घेतो, त्यामुळे ब्राउझर तो क्लिकचा संदर्भ विसरतो आणि ऑडिओ ब्लॉक करतो.
 द मास्टर फिक्स (The Silent Audio Trick):
