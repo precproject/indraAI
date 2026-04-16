@@ -49,7 +49,10 @@ const VoiceRoom = () => {
             audioContent: result.audioContent,
             voice_text: result.voice_text,
             chatId: result.chatId,
-            feedback: null
+            feedback: null,
+            is_complete: result.is_complete,
+            extracted_data: result.extracted_data,
+            intent: result.intent
           };
           
           setChatHistory([aiMessage]);
@@ -95,7 +98,7 @@ const VoiceRoom = () => {
 
   // 🟢 नवीन: माईक चालू करताना जुना ऑडिओ थांबवा
   const handleMicToggle = (e) => {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     apiService.stopAudio(); 
     setRadioState('idle'); 
     toggleListening();
@@ -116,16 +119,13 @@ const VoiceRoom = () => {
 
   const handleFeedback = async (messageIndex, type) => {
     const updatedHistory = [...chatHistory];
-    const targetMessage = updatedHistory[messageIndex];
-    targetMessage.feedback = type;
+    updatedHistory[messageIndex].feedback = type;
     setChatHistory(updatedHistory);
     
-    if (targetMessage.chatId) {
+    if (updatedHistory[messageIndex].chatId) {
       try {
-        await apiService.sendFeedback(targetMessage.chatId, type);
-      } catch (e) {
-        console.warn("Feedback save failed");
-      }
+        await apiService.sendFeedback(updatedHistory[messageIndex].chatId, type);
+      } catch (e) { console.warn(e); }
     }
   };
 
@@ -137,25 +137,29 @@ const VoiceRoom = () => {
   const stopAudio = () => {
     apiService.stopAudio();
     setRadioState('idle');
-  }
+  };
 
-  const handleSend = async () => {
-    if (!manualText.trim() && !imageFile) return;
+  // 🟢 MAIN SEND HANDLER (Handles Text + Image + Native Speech seamlessly)
+  const handleSend = async (customText = null) => {
+    let textToSend = typeof customText === 'string' ? customText : manualText;
+
+       // 🟢 जर मजकूर रिकामा असेल, पण फोटो असेल, तर एक डिफॉल्ट मजकूर टाका
+    if (!textToSend.trim() && imageFile) {
+        textToSend = "कृपया या फोटोची माहिती द्या.";
+    }
+
+    // जर मजकूर आणि फोटो दोन्ही नसतील तर काहीच करू नका
+    if (!textToSend.trim() && !imageFile) return;
 
     // 🟢 मेसेज सेंड करताना जुना ऑडिओ थांबवा
     apiService.stopAudio();
 
     if (isListening) toggleListening(); 
 
-    const userMessage = { 
-      sender: 'user', 
-      text: manualText, 
-      image: imagePreview 
-    };
-    setChatHistory(prev => [...prev, userMessage]);
+    setChatHistory(prev => [...prev, { sender: 'user', text: textToSend, image: imagePreview }]);
     
     setRadioState('thinking');
-    const currentText = manualText; 
+    const currentText = textToSend; 
     const currentImageFile = imageFile;
     const currentImagePreview = imagePreview;
     
@@ -163,7 +167,8 @@ const VoiceRoom = () => {
     removeImage(); 
 
     try {
-      const result = await apiService.processTextCommand(currentText, imageFile, selectedLang);
+      // Native Speech हे टेक्स्ट मध्येच कन्व्हर्ट होत असल्यामुळे आपण नेहमी 'processTextCommand' वापरणार.
+      const result = await apiService.processTextCommand(currentText, currentImageFile, selectedLang);
 
       const aiMessage = {
         sender: 'ai',
@@ -175,7 +180,8 @@ const VoiceRoom = () => {
         chatId: result.chatId, 
         feedback: null,
         is_complete: result.is_complete, // 🟢 Needed for UI Form
-        extracted_data: result.extracted_data // 🟢 Needed for UI Form
+        extracted_data: result.extracted_data, // 🟢 Needed for UI Form,
+        intent: result.intent
       };
       
       setChatHistory(prev => [...prev, aiMessage]);
@@ -185,6 +191,9 @@ const VoiceRoom = () => {
         await addLedgerEntry(result.action.payload);
       } else if (result.action?.type === 'ADD_LEDGER_LOCAL' && result.action.payload) {
         addLocalLedgerEntry(result.action.payload); 
+      } else if (result.action?.type === 'ADD_ACTIVITY_LOCAL' && result.action.payload) {
+        // जर AppContext मध्ये addLocalActivityEntry असेल, तर तुम्ही इथे कॉल करू शकता.
+        console.log("Activity Saved Locally:", result.action.payload);
       }
 
       if (result.action?.type === 'UPDATE_PROFILE' && result.action.payload) {
@@ -210,6 +219,7 @@ const VoiceRoom = () => {
       setChatHistory(prev => [...prev, { sender: 'ai', text: errorMsg }]);
       setRadioState('idle');
 
+      // Restore inputs on failure
       setManualText(currentText);
       if (currentImageFile) {
         setImageFile(currentImageFile);
@@ -222,9 +232,19 @@ const VoiceRoom = () => {
   };
 
   // 🟢 DYNAMIC SMART FORM COMPONENT
-  const renderMissingDataForm = (extractedData) => {
-    if (!extractedData) return null;
+  const renderMissingDataForm = (extractedData, intent) => {
+    if (!extractedData || !intent) return null;
 
+    // १. इंटेंट नुसार आवश्यक फील्ड्सची यादी (Intent-Aware Mapping)
+    const INTENT_FIELDS = {
+      'EXPENSE_LOG': ['crop', 'variety', 'area', 'category', 'amount', 'event_date', 'agri_inputs'],
+      'INCOME_LOG': ['crop', 'quantity_in_quintal', 'amount', 'market', 'event_date'],
+      'ACTIVITY_LOG': ['crop', 'variety', 'area', 'category', 'event_date', 'agri_inputs']
+    };
+
+    // जर इंटेंट मॅप झाला नाही, तर सर्व फील्ड्स घ्या 
+    const allowedKeys = INTENT_FIELDS[intent] || Object.keys(extractedData);
+    
     // Define all possible fields and their types
     const ALL_FIELDS = [
       { key: 'crop', label: 'पीक', type: 'text', placeholder: 'उदा. गहू' },
@@ -235,11 +255,13 @@ const VoiceRoom = () => {
       { key: 'quantity_in_quintal', label: 'क्विंटल', type: 'number', placeholder: 'उदा. १०' },
       { key: 'market', label: 'बाजार', type: 'text', placeholder: 'उदा. लासलगाव' },
       { key: 'event_date', label: 'तारीख', type: 'date' },
-      { key: 'agri_inputs', label: 'खत/औषध नाव', type: 'text', placeholder: 'उदा. 10:26:26' },
+      { key: 'agri_inputs', label: 'खत/औषध नाव', type: 'text', placeholder: 'उदा. महाधन 10:26:26' },
     ];
 
     // Filter fields that are strictly NULL (meaning they are missing)
-    const missingFields = ALL_FIELDS.filter(f => extractedData[f.key] === null);
+    const missingFields = ALL_FIELDS.filter(f => 
+      allowedKeys.includes(f.key) && extractedData[f.key] === null
+    );
 
     if (missingFields.length === 0) return null;
 
@@ -250,32 +272,43 @@ const VoiceRoom = () => {
       
       missingFields.forEach(field => {
          const val = formData.get(field.key);
-         if(val) updates.push(`${field.label}: ${val}`);
+         // फक्त भरलेली माहितीच पाठवा (Empty string टाळण्यासाठी)
+         if(val && val.trim() !== '') {
+             updates.push(`${field.label}: ${val.trim()}`);
+         }
       });
       
       if(updates.length > 0) {
-         handleSend(`माहिती: ${updates.join(', ')}`); // Send merged text to AI
+         handleSend(`माहिती: ${updates.join(', ')}`); // भरलेली माहिती AI ला पाठवा
+      } else {
+         alert("कृपया किमान एक माहिती भरा."); // जर शेतकऱ्याने रिकाम्या फॉर्मवर क्लिक केले तर
       }
     };
     return (
-      <form onSubmit={handleSubmitForm} className="mt-4 bg-[#fdf8f0] p-4 rounded-xl border border-[#d4a853]/40">
+      <form onSubmit={handleSubmitForm} className="mt-4 bg-[#fdf8f0] p-4 rounded-xl border border-[#d4a853]/40 shadow-sm">
         <p className="text-xs font-bold text-[#8b5e3c] mb-3 border-b border-[#d4a853]/20 pb-2">✏️ कृपया अपूर्ण माहिती भरा:</p>
         <div className="grid grid-cols-2 gap-3 mb-3">
           {missingFields.map(field => (
-            <div key={field.key}>
-              <label className="text-[10px] text-gray-500 uppercase font-bold">{field.label}</label>
+            <div key={field.key} className="flex flex-col">
+              <label className="text-[10px] text-gray-500 uppercase font-bold mb-1">{field.label}</label>
               {field.type === 'select' ? (
-                <select name={field.key} className="w-full text-sm p-2 rounded border border-gray-200 outline-none focus:border-[#4a9e4a] bg-white">
+                <select name={field.key} className="w-full text-sm p-2 rounded-lg border border-gray-300 outline-none focus:border-[#4a9e4a] bg-white transition-colors">
                   <option value="">निवडा...</option>
                   {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               ) : (
-                <input name={field.key} type={field.type} step={field.type === 'number' ? '0.1' : undefined} placeholder={field.placeholder || ''} className="w-full text-sm p-2 rounded border border-gray-200 outline-none focus:border-[#4a9e4a]" />
+                <input 
+                  name={field.key} 
+                  type={field.type} 
+                  step={field.type === 'number' ? '0.1' : undefined} 
+                  placeholder={field.placeholder || ''} 
+                  className="w-full text-sm p-2 rounded-lg border border-gray-300 outline-none focus:border-[#4a9e4a] bg-white transition-colors" 
+                />
               )}
             </div>
           ))}
         </div>
-        <button type="submit" className="w-full bg-[#4a9e4a] text-white py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-[#368636]">
+        <button type="submit" className="w-full bg-gradient-to-r from-[#4a9e4a] to-[#2d6a2d] text-white py-2.5 rounded-lg text-sm font-bold shadow-md hover:shadow-lg hover:scale-[1.02] transition-all">
           माहिती जतन करा
         </button>
       </form>
@@ -351,11 +384,11 @@ const VoiceRoom = () => {
                                 
                 {msg.sender === 'ai' && (
                   <>
-                    {/* 🟢 RENDER DYNAMIC FORM if data is missing and it's the last message */}
-                    {msg.is_complete === false && msg.extracted_data && idx === chatHistory.length - 1 && (
-                       renderMissingDataForm(msg.extracted_data)
+                    {/* 🟢 RENDER DYNAMIC FORM if data is missing, intent exists, and it's the last message */}
+                    {msg.is_complete === false && msg.extracted_data && msg.intent && idx === chatHistory.length - 1 && (
+                       renderMissingDataForm(msg.extracted_data, msg.intent)
                     )}
-                    
+
                     <div className="mt-4 space-y-2">
                       {msg.action?.type.includes('ADD_LEDGER') && <p className="text-xs font-bold text-[#166534] bg-[#f0fdf4] p-2 rounded-lg flex items-center gap-1.5 border border-[#bbf7d0]"><CheckCircle2 size={14}/> हिशोब जतन केला</p>}
                       {msg.action?.type.includes('ADD_ACTIVITY') && <p className="text-xs font-bold text-[#1e3a8a] bg-[#eff6ff] p-2 rounded-lg flex items-center gap-1.5 border border-[#bfdbfe]"><Sprout size={14}/> नोंद जतन केली</p>}
@@ -478,7 +511,7 @@ const VoiceRoom = () => {
 
           <button 
             type="button"
-            onClick={handleSend} 
+            onClick={() => handleSend(null)}
             disabled={radioState === 'thinking' || (!manualText.trim() && !imageFile)} 
             className="p-3.5 bg-gradient-to-r from-[#4a9e4a] to-[#2d6a2d] text-white rounded-full disabled:opacity-50 shrink-0 hover:scale-105 transition-transform shadow-md"
           >
