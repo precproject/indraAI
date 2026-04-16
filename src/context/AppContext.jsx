@@ -105,11 +105,25 @@ export const AppProvider = ({ children }) => {
     setUser((prev) => ({ ...prev, credits: (prev?.credits || 0) + points }));
   };
 
+  // 🟢 NEW: Update Local Cycle State directly
+  const updateLocalCycle = (cycleId, updates) => {
+    setCycles((prev) => 
+      prev.map(c => c.id === cycleId ? { ...c, ...updates } : c)
+    );
+  };
+
+  // 🟢 NEW: Update Local Ledger State directly
+  const updateLocalLedgerEntry = (ledgerId, updates) => {
+    setLedger((prev) => 
+      prev.map(entry => entry.id === ledgerId ? { ...entry, ...updates } : entry)
+    );
+  };
+
   return (
     <AppContext.Provider value={{ 
       user, cycles, ledger, isLoading, chatHistory, setChatHistory,
       loginUser, logoutUser, updateUserProfile, addLedgerEntry,
-      addLocalLedgerEntry, addLocalCycle, addCredits // नवीन फंक्शन्स बाहेर पाठवली
+      addLocalLedgerEntry, addLocalCycle, addCredits, updateLocalCycle, updateLocalLedgerEntry// नवीन फंक्शन्स बाहेर पाठवली
     }}>
       {children}
     </AppContext.Provider>

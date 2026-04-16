@@ -46,7 +46,7 @@ export const apiService = {
     return await response.json();
   },
 
-  // ३. व्हॉइस कॅसेट पाठवणे (Updated for Crop Stage & Area)
+  // ३. व्हॉइस कॅसेट पाठवणे
   async processVoiceCommand(audioBlob, language) {
     const formData = new FormData();
     formData.append('voice', audioBlob, 'recording.webm');
@@ -62,7 +62,7 @@ export const apiService = {
     return await response.json();
   },
 
-  // ४. मजकूर आणि फोटो पाठवणे (Updated for Crop Stage & Area)
+  // ४. मजकूर आणि फोटो पाठवणे
   async processTextCommand(text, imageFile, language) {
     const formData = new FormData();
     formData.append('text', text);
@@ -96,7 +96,7 @@ export const apiService = {
     return await response.json();
   },
 
-  // ── नवीन: फीडबॅक सेव्ह करणे (Feedback API) ──
+  // ── फीडबॅक सेव्ह करणे (Feedback API) ──
   async sendFeedback(chatId, feedbackType) {
     const response = await fetch(`${API_BASE}/feedback`, {
       method: 'POST',
@@ -106,7 +106,6 @@ export const apiService = {
       },
       body: JSON.stringify({ chatId, feedbackType })
     });
-    // जरी एरर आली तरी आपण UI थांबवणार नाही, म्हणून फक्त रिझल्ट परत पाठवू
     if (!response.ok) return { success: false };
     return await response.json();
   },
@@ -144,7 +143,7 @@ export const apiService = {
       } else if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(fallbackText);
         const voices = speechSynthesis.getVoices();
-        currentAudioPlayer = utterance; // SpeechSynthesis ला ट्रॅक करणे थोडे वेगळे असते
+        currentAudioPlayer = utterance; 
 
         const voice =
           voices.find(v => v.lang === "mr-IN") ||
@@ -162,7 +161,7 @@ export const apiService = {
     }
   },
 
-  // 🟢 नवीन: चालू असलेला ऑडिओ थांबवणे
+  // 🟢 चालू असलेला ऑडिओ थांबवणे
   stopAudio() {
     if (currentAudioPlayer instanceof Audio) {
       currentAudioPlayer.pause();
@@ -174,16 +173,16 @@ export const apiService = {
     currentAudioPlayer = null;
   },
 
-  // प्रोफाईल अपडेट करणे
-// प्रोफाईल अपडेट करणे (खरा API कॉल)
-  async updateProfile(userId, profileData) {
-    const response = await fetch(`${API_BASE}/user/profile`, {
+  // ── 🟢 UPDATED: प्रोफाईल अपडेट करणे (Matched with backend route) ──
+  async updateProfile(profileData) {
+    const response = await fetch(`${API_BASE}/farmer/profile`, {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': getSecurityPass() 
       },
-      body: JSON.stringify({ userId, ...profileData })
+      // Note: Backend extracts farmerId from token, so no need to pass userId in body
+      body: JSON.stringify(profileData) 
     });
     
     if (!response.ok) throw new Error('प्रोफाईल सेव्ह करता आले नाही');
@@ -195,25 +194,28 @@ export const apiService = {
     return new Promise((resolve) => setTimeout(() => resolve({ success: true, data: { id: Date.now(), ...farmData } }), 500));
   },
 
-  // पॉईंट्सचा इतिहास आणणे
-  async getCreditHistory(userId) {
-    return new Promise((resolve) => setTimeout(() => resolve([
-      { id: 1, date: new Date().toISOString().slice(0, 10), reason: 'प्रोफाईल पूर्ण केले', points: 50 },
-      { id: 2, date: new Date().toISOString().slice(0, 10), reason: 'खताचा हिशोब जोडला', points: 15 },
-      { id: 3, date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), reason: 'शेतातील कामाची नोंद', points: 10 }
-    ]), 600));
-  },
-
-  // 🟢 Cycle Room साठी विशिष्ट पिकाचा हिशोब आणि संवाद आणणे
-  async getCropTimeline(cropName) {
-    const response = await fetch(`${API_BASE}/cycles/timeline?crop=${cropName}`, {
+  // ── 🟢 UPDATED: पॉईंट्सचा इतिहास आणणे ──
+  async getCreditHistory() {
+    const response = await fetch(`${API_BASE}/credits/history`, {
       headers: { 'Authorization': getSecurityPass() }
     });
-    if (!response.ok) return { ledger: [], chats: [] };
+    if (!response.ok) return []; // Return empty array on failure, not object
     return await response.json();
   },
 
-  // 🟢 नवीन: पिकाची सविस्तर माहिती आणणे
+  // ── 🟢 UPDATED: चॅट हिस्ट्री आणणे (Pagination सह) ──
+  async getChatHistory(page = 1, limit = 30, date = null) {
+    let url = `${API_BASE}/chats?page=${page}&limit=${limit}`;
+    if (date) url += `&date=${date}`; // जर तारीख असेल तर URL मध्ये जोडा
+
+    const response = await fetch(url, {
+      headers: { 'Authorization': getSecurityPass() }
+    });
+    if (!response.ok) throw new Error('Failed to fetch chat history');
+    return await response.json();
+  },
+
+  // 🟢 पिकाची सविस्तर माहिती आणणे
   async getCycleDetails(cycleId) {
     const response = await fetch(`${API_BASE}/cycles/${cycleId}`, {
       headers: { 'Authorization': getSecurityPass() }
@@ -228,6 +230,34 @@ export const apiService = {
       headers: { 'Authorization': getSecurityPass() }
     });
     if (!response.ok) throw new Error('Failed to fetch cycles');
+    return await response.json();
+  },
+
+  // 🟢 पिकाची अपूर्ण माहिती भरणे (Missing Info Update)
+  async updateCycle(cycleId, updates) {
+    const response = await fetch(`${API_BASE}/farmer/cycle/${cycleId}`, {
+      method: 'PUT',
+      headers: { 
+        'Authorization': getSecurityPass(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) throw new Error('Update failed');
+    return await response.json();
+  },
+  
+  // 🟢 (Optional) हिशोब अपडेट करणे
+  async updateLedger(ledgerId, updates) {
+    const response = await fetch(`${API_BASE}/farmer/ledger/${ledgerId}`, {
+      method: 'PUT',
+      headers: { 
+        'Authorization': getSecurityPass(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) throw new Error('Ledger update failed');
     return await response.json();
   }
 };
