@@ -52,7 +52,7 @@ export const apiService = {
     formData.append('voice', audioBlob, 'recording.webm');
     formData.append('language', language || 'mr-IN');
 
-    const response = await fetch(`${API_BASE}/chat`, {
+    const response = await fetch(`${API_BASE}/v2/chat`, {
       method: 'POST',
       headers: { 'Authorization': getSecurityPass() },
       body: formData
@@ -72,7 +72,27 @@ export const apiService = {
       formData.append('image', imageFile);
     }
 
-    const response = await fetch(`${API_BASE}/chat`, {
+    const response = await fetch(`${API_BASE}/v2/chat`, {
+      method: 'POST',
+      headers: { 'Authorization': getSecurityPass() },
+      body: formData
+    });
+    
+    if (!response.ok) throw new Error('माहिती पाठवता आली नाही');
+    return await response.json();
+  },
+
+    // ४. मजकूर आणि फोटो पाठवणे
+  async processTextCommandV2(text, imageFile, language) {
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('language', language || 'mr-IN'); 
+
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
+    const response = await fetch(`${API_BASE}/v2/chat`, {
       method: 'POST',
       headers: { 'Authorization': getSecurityPass() },
       body: formData

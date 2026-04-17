@@ -39,7 +39,8 @@ const VoiceRoom = () => {
         setRadioState('thinking');
         try {
           const hiddenMessage = "नमस्कार,";
-          const result = await apiService.processTextCommand(hiddenMessage, null, selectedLang);
+          //const result = await apiService.processTextCommand(hiddenMessage, null, selectedLang);
+          const result = await apiService.processTextCommandV2(hiddenMessage, null, selectedLang);
 
           const aiMessage = {
             sender: 'ai',
