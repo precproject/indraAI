@@ -3,7 +3,7 @@ export const locationService = {
   async getDistrict(existingDistrict = null) {
     
     // ── Layer 1: Check if we already know the location ──
-    if (existingDistrict && existingDistrict !== 'महाराष्ट्र' && existingDistrict !== 'माहित नाही') {
+    if (existingDistrict && existingDistrict !== 'माहित नाही') {
       return existingDistrict;
     }
 
@@ -43,6 +43,6 @@ export const locationService = {
     }
 
     // ── Layer 5: Safe Default ──
-    return 'महाराष्ट्र';
+    return '';
   }
 };

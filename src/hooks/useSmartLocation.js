@@ -7,6 +7,7 @@ export const useSmartLocation = () => {
     lng: null,
     village: '',
     district: '',
+    taluka:'',
     state: '',
     pincode: ''
   });
@@ -64,11 +65,12 @@ export const useSmartLocation = () => {
           const village = address.village || address.town || address.city || '';
           const rawDistrict = address.state_district || address.county || '';
           const district = rawDistrict.replace(' District', '').replace(' जिल्हा', '').trim();
+          const taluka = address.county || '';
           const state = address.state || 'Maharashtra';
           const pincode = address.postcode || '';
 
           // माहिती स्टेटमध्ये सेव्ह करणे
-          setLocationData({ lat, lng, village, district, state, pincode });
+          setLocationData({ lat, lng, village, district, state, pincode,taluka });
           
         } catch (err) {
           setError('पत्ता शोधताना अडचण आली. कृपया माहिती हाताने भरा.');

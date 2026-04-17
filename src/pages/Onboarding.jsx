@@ -10,13 +10,13 @@ const Onboarding = () => {
   const { user, updateUserProfile } = useAppContext();
   const { translateToMarathi } = useMarathiTranslation();
   const [errors, setErrors] = useState({});
-
   const navigate = useNavigate();
   
   const { locationData, isLocating, error: locationError, fetchLocation } = useSmartLocation();
 
   const [name, setName] = useState('');
   const [district, setDistrict] = useState(user?.district || '');
+  const [taluka, setTaluka] = useState(user?.taluka || ''); // 🟢 Added Taluka State
   const [village, setVillage] = useState('');
   const [pincode, setPincode] = useState('');
   const [stateName, setStateName] = useState('महाराष्ट्र');
@@ -24,21 +24,15 @@ const Onboarding = () => {
 
   const isLocationFound = locationData?.lat && locationData?.lng;
 
-  // ✅ Detect English anywhere in string
+  // ✅ Translation Handler
   const containsEnglish = (text) => /[A-Za-z]/.test(text);
 
   const handleTranslateOnBlur = async (value, setter, field) => {
     if (!value) return;
-
-    // ❌ Skip pincode
     if (field === "pincode") return;
-
-    // ❌ Skip if no English
-    if (!containsEnglish(value)) return;
 
     try {
       const translated = await translateToMarathi(value);
-
       if (translated && translated !== value) {
         setter(translated);
       }
@@ -50,6 +44,7 @@ const Onboarding = () => {
   // 🟢 १. पेज लोड होताच आपोआप लोकेशनची परवानगी मागणे
   useEffect(() => {
     fetchLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 🟢 Auto-fill + translate location data
@@ -57,23 +52,28 @@ const Onboarding = () => {
     const translateLocationFields = async () => {
       if (locationData?.lat) {
         const v = locationData.village || '';
+        const t = locationData.taluka || ''; // 🟢 Extract Taluka from useSmartLocation if available
         const d = locationData.district || '';
         const s = locationData.state || 'महाराष्ट्र';
 
         setPincode(locationData.pincode || '');
 
         try {
+          // Await translations for auto-filled data
           setVillage(containsEnglish(v) ? await translateToMarathi(v) : v);
+          setTaluka(containsEnglish(t) ? await translateToMarathi(t) : t); // 🟢 Translate Taluka
           setDistrict(containsEnglish(d) ? await translateToMarathi(d) : d);
           setStateName(containsEnglish(s) ? await translateToMarathi(s) : s);
         } catch (err) {
           console.error("Auto translation failed:", err);
           setVillage(v);
+          setTaluka(t);
           setDistrict(d);
           setStateName(s);
         }
       }
 
+      // If user is already fully onboarded, redirect them
       if (user?.isProfileComplete && user?.name !== "") {
         navigate('/app');
       }
@@ -82,78 +82,56 @@ const Onboarding = () => {
     translateLocationFields();
   }, [locationData]);
 
-  const handleCompleteProfile = async (e) => {
-    e.preventDefault();
-
-    // 🔥 Validate first
-    if (!validateFields()) return;
-
-    if (!name || !district) return;
-    setIsSaving(true);
-
-    const fullProfileData = {
-      name,
-      district,
-      village,
-      state: stateName,
-      pincode,
-      latitude: locationData.lat,
-      longitude: locationData.lng,
-      isProfileComplete: true
-    };
-
-    try {
-      // १. Local Context अपडेट करा
-      updateUserProfile(fullProfileData);
-      
-      // २. खरा API कॉल करून डेटाबेसमध्ये कायमस्वरूपी सेव्ह करा
-      if (user?.id) {
-        await apiService.updateProfile(user.id, fullProfileData);
-      }
-      navigate('/app'); 
-      
-    } catch (error) {
-      console.error("Profile saving failed:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const validateFields = () => {
     const newErrors = {};
 
-    // Name
-    if (!name.trim()) {
-      newErrors.name = "नाव आवश्यक आहे";
-    } else if (name.length < 3) {
-      newErrors.name = "नाव किमान ३ अक्षरांचे असावे";
-    } else if (/\d/.test(name)) {
-      newErrors.name = "नावात अंक नसावेत";
-    }
+    if (!name.trim()) newErrors.name = "नाव आवश्यक आहे";
+    else if (name.length < 3) newErrors.name = "नाव किमान ३ अक्षरांचे असावे";
+    else if (/\d/.test(name)) newErrors.name = "नावात अंक नसावेत";
 
-    // District
-    if (!district.trim()) {
-      newErrors.district = "जिल्हा आवश्यक आहे";
-    }
-
-    // State
-    if (!stateName.trim()) {
-      newErrors.state = "राज्य आवश्यक आहे";
-    }
-
-    // State
-    if (!village.trim()) {
-      newErrors.village = "गाव आवश्यक आहे";
-    }
-
-    // Pincode
+    if (!district.trim()) newErrors.district = "जिल्हा आवश्यक आहे";
+    if (!stateName.trim()) newErrors.state = "राज्य आवश्यक आहे";
+    if (!village.trim()) newErrors.village = "गाव आवश्यक आहे";
+    
+    // 🟢 Optional Taluka validation (make required if needed)
+    // if (!taluka.trim()) newErrors.taluka = "तालुका आवश्यक आहे";
+    
     if (pincode && !/^\d{6}$/.test(pincode)) {
       newErrors.pincode = "पिनकोड ६ अंकी असावा";
     }
 
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCompleteProfile = async (e) => {
+    e.preventDefault();
+
+    if (!validateFields()) return;
+    setIsSaving(true);
+
+    const fullProfileData = {
+      name,
+      district,
+      taluka, // 🟢 Add Taluka to final payload
+      village,
+      state: stateName,
+      pincode,
+      latitude: locationData?.lat || null,
+      longitude: locationData?.lng || null,
+      isProfileComplete: true
+    };
+
+    try {
+      updateUserProfile(fullProfileData);
+      await apiService.updateProfile(fullProfileData); // Sending only the data object
+      navigate('/app'); 
+    } catch (error) {
+      console.error("Profile saving failed:", error);
+      alert("प्रोफाईल सेव्ह करताना त्रुटी आली. कृपया पुन्हा प्रयत्न करा.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -165,6 +143,7 @@ const Onboarding = () => {
           
           <form onSubmit={handleCompleteProfile} className="space-y-4">
             
+            {/* ── Name ── */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <User size={20} className="text-[#8b5e3c]/50" />
@@ -173,16 +152,15 @@ const Onboarding = () => {
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onBlur={() => handleTranslateOnBlur(name, setName)}
+                onBlur={() => handleTranslateOnBlur(name, setName, 'name')}
                 placeholder="तुमचे पूर्ण नाव"
-                className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-2xl pl-12 pr-4 py-3.5 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
+                className={`w-full bg-[#fdf8f0] border ${errors.name ? 'border-red-500' : 'border-[#d4a853]/50'} rounded-2xl pl-12 pr-4 py-3.5 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]`}
                 required
               />
-              {errors.name && (
-                <p className="text-xs text-red-500 mt-1 font-bold">{errors.name}</p>
-              )}
+              {errors.name && <p className="text-xs text-red-500 mt-1 font-bold">{errors.name}</p>}
             </div>
 
+            {/* ── GPS Button ── */}
             <button
               type="button"
               onClick={fetchLocation}
@@ -195,6 +173,7 @@ const Onboarding = () => {
 
             {locationError && <p className="text-xs text-red-500 font-bold text-center">{locationError}</p>}
 
+            {/* ── Village & Taluka ── */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] font-bold text-[#8b5e3c] ml-1 uppercase tracking-widest">गाव / शहर</label>
@@ -202,14 +181,44 @@ const Onboarding = () => {
                   type="text" 
                   value={village}
                   onChange={(e) => setVillage(e.target.value)}
-                  onBlur={() => handleTranslateOnBlur(village, setVillage)}
+                  onBlur={() => handleTranslateOnBlur(village, setVillage, 'village')}
                   placeholder="गाव"
-                  className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
+                  className={`w-full bg-[#fdf8f0] border ${errors.village ? 'border-red-500' : 'border-[#d4a853]/50'} rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]`}
                 />
-                {errors.village && (
-                  <p className="text-xs text-red-500 mt-1 font-bold">{errors.village}</p>
-                )}
+                {errors.village && <p className="text-xs text-red-500 mt-1 font-bold">{errors.village}</p>}
               </div>
+              
+              {/* 🟢 NEW: Taluka Field */}
+              <div>
+                <label className="text-[10px] font-bold text-[#8b5e3c] ml-1 uppercase tracking-widest">तालुका</label>
+                <input 
+                  type="text" 
+                  value={taluka}
+                  onChange={(e) => setTaluka(e.target.value)}
+                  onBlur={() => handleTranslateOnBlur(taluka, setTaluka, 'taluka')}
+                  placeholder="तालुका"
+                  className={`w-full bg-[#fdf8f0] border ${errors.taluka ? 'border-red-500' : 'border-[#d4a853]/50'} rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]`}
+                />
+                {errors.taluka && <p className="text-xs text-red-500 mt-1 font-bold">{errors.taluka}</p>}
+              </div>
+            </div>
+
+            {/* ── District & Pincode ── */}
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div className="relative">
+                <label className="text-[10px] font-bold text-[#8b5e3c] ml-1 uppercase tracking-widest">जिल्हा</label>
+                <input 
+                  type="text" 
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  onBlur={() => handleTranslateOnBlur(district, setDistrict, 'district')}
+                  placeholder="जिल्हा"
+                  className={`w-full bg-[#fdf8f0] border ${errors.district ? 'border-red-500' : 'border-[#d4a853]/50'} rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]`}
+                  required
+                />
+                {errors.district && <p className="text-xs text-red-500 mt-1 font-bold">{errors.district}</p>}
+              </div>
+              
               <div>
                 <label className="text-[10px] font-bold text-[#8b5e3c] ml-1 uppercase tracking-widest">पिनकोड</label>
                 <input 
@@ -218,47 +227,26 @@ const Onboarding = () => {
                   onChange={(e) => setPincode(e.target.value)}
                   placeholder="पिनकोड"
                   maxLength={6}
-                  className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
+                  className={`w-full bg-[#fdf8f0] border ${errors.pincode ? 'border-red-500' : 'border-[#d4a853]/50'} rounded-xl px-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]`}
                 />
-                {errors.pincode && (
-                  <p className="text-xs text-red-500 mt-1 font-bold">{errors.pincode}</p>
-                )}
+                {errors.pincode && <p className="text-xs text-red-500 mt-1 font-bold">{errors.pincode}</p>}
               </div>
             </div>
 
+            {/* ── State ── */}
             <div className="relative mt-2">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <MapPin size={20} className="text-[#8b5e3c]/50" />
-              </div>
-              <input 
-                type="text" 
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                onBlur={() => handleTranslateOnBlur(district, setDistrict)}
-                placeholder="तुमचा जिल्हा (उदा. नाशिक)"
-                className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-2xl pl-12 pr-4 py-3.5 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
-                required
-              />
-              {errors.district && (
-                <p className="text-xs text-red-500 mt-1 font-bold">{errors.district}</p>
-              )}
-            </div>
-
-            <div className="relative mt-2">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none pt-5">
                 <MapPin size={20} className="text-[#8b5e3c]/50" />
               </div>
               <input 
                 type="text" 
                 value={stateName}
                 onChange={(e) => setStateName(e.target.value)}
-                onBlur={() => handleTranslateOnBlur(stateName, setStateName)}
+                onBlur={() => handleTranslateOnBlur(stateName, setStateName, 'state')}
                 placeholder="राज्य (उदा. महाराष्ट्र)"
-                className="w-full bg-[#fdf8f0] border border-[#d4a853]/50 rounded-2xl pl-12 pr-4 py-3.5 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a]"
+                className={`w-full bg-[#fdf8f0] border ${errors.state ? 'border-red-500' : 'border-[#d4a853]/50'} rounded-2xl pl-12 pr-4 py-3 text-[#2c1810] font-bold focus:outline-none focus:border-[#4a9e4a] mt-5`}
               />
-              {errors.state && (
-                <p className="text-xs text-red-500 mt-1 font-bold">{errors.state}</p>
-              )}
+              {errors.state && <p className="text-xs text-red-500 mt-1 font-bold">{errors.state}</p>}
             </div>
 
             <button 

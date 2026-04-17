@@ -80,7 +80,7 @@ const MarketRoom = () => {
           </h2>
           <div className="flex flex-col gap-1 mt-1">
             <p className="text-sm font-bold text-[#8b5e3c] tracking-wide flex items-center gap-1">
-              <MapPin size={12}/> {user?.district || 'महाराष्ट्र'} परिसरातील ताजे भाव
+              <MapPin size={12}/> {user?.district} परिसरातील ताजे भाव
             </p>
             {/* 🟢 नवीन: Last Updated Time */}
             {lastUpdated && (
